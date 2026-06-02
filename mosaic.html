@@ -607,100 +607,7 @@ body{
 
 </div>
 
-<!-- =====================================
-     SCRIPT
-===================================== -->
-
-<script>
-
-/* =====================================
-   DADOS
-===================================== */
-
-let videos =
-JSON.parse(
-localStorage.getItem("videos")
-|| "[]"
-);
-
-/* =====================================
-   LAYOUT SALVO
-===================================== */
-
-let currentLayout =
-localStorage.getItem("layoutMode")
-|| "default";
-
-/* =====================================
-   ROTATIVO
-===================================== */
-
-let featuredIndex = 0;
-
-let rotateTimer = null;
-
-/* =====================================
-   OVERLAY
-===================================== */
-
-let overlayTimer = null;
-
-let modalOpened = false;
-
-/* =====================================
-   SWAP
-===================================== */
-
-let swapSelected = [];
-
-/* =====================================
-   HELPERS
-===================================== */
-
-function showModal(id){
-
-    modalOpened = true;
-
-    document
-    .getElementById(id)
-    .style.display = "flex";
-}
-
-function hideModal(id){
-
-    modalOpened = false;
-
-    document
-    .getElementById(id)
-    .style.display = "none";
-}
-
-function saveLayout(){
-
-    localStorage.setItem(
-        "layoutMode",
-        currentLayout
-    );
-}
-
-function extractID(url){
-
-    if(!url)
-        return null;
-
-    let m =
-    url.match(
-    /(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/
-    );
-
-    return m
-    ? m[2]
-    : null;
-}
-
-/* =====================================
-   OVERLAY INTELIGENTE
-===================================== */
+====== */
 
 function showOverlay(){
 
@@ -1281,7 +1188,8 @@ function load(){
                 tile
             );
         }
-            }/* =====================
+            }
+  /* =====================
        LAYOUT ROTATIVO
     ===================== */
 
@@ -1337,13 +1245,22 @@ function load(){
         );
 
         side.style.display =
-        "grid";
+"flex";
 
-        side.style.gridTemplateRows =
-        `repeat(${Math.max(sideVideos.length,1)},1fr)`;
+side.style.flexDirection =
+"column";
 
-        side.style.gap =
-        "2px";
+side.style.justifyContent =
+"center";
+
+side.style.alignItems =
+"stretch";
+
+side.style.gap =
+"2px";
+
+side.style.height =
+"100%";
 
         sideVideos.forEach(url=>{
 
@@ -1354,6 +1271,11 @@ function load(){
 
             tile.className =
             "tile";
+		    tile.style.flex =
+"0 0 auto";
+
+tile.style.aspectRatio =
+"16 / 9";
 
             tile.innerHTML =
             createFrame(url);
