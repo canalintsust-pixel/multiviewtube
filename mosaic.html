@@ -25,7 +25,7 @@ html, body {
 }
 
 /* =========================
-   STAGE 16:9 FIXO
+   CANVAS 16:9 CENTRAL
 ========================= */
 
 #stage {
@@ -36,8 +36,9 @@ html, body {
 
     width:100vw;
     height:calc(100vw * 9 / 16);
-    max-height:100vh;
+
     max-width:calc(100vh * 16 / 9);
+    max-height:100vh;
 
     display:grid;
     gap:2px;
@@ -54,16 +55,16 @@ html, body {
     height:100%;
     background:#000;
     overflow:hidden;
-    border-radius:6px;
+    border:2px solid transparent;
 }
 
 .tile.selected {
-    outline:2px solid red;
+    border:2px solid red;
+    box-shadow:0 0 10px red;
 }
 
 /* iframe */
 iframe {
-    position:absolute;
     width:100%;
     height:100%;
     border:none;
@@ -76,18 +77,18 @@ iframe {
     left:0;
     right:0;
     bottom:0;
-    background:rgba(0,0,0,0.85);
+    background:rgba(120,0,0,0.7);
     color:white;
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:12px;
     flex-direction:column;
+    font-size:14px;
     z-index:5;
 }
 
 /* =========================
-   OVERLAY INTELIGENTE
+   OVERLAY (AUTO HIDE)
 ========================= */
 
 #overlay {
@@ -100,7 +101,7 @@ iframe {
     gap:6px;
 
     opacity:0;
-    transition:0.25s;
+    transition:0.2s;
     pointer-events:none;
 }
 
@@ -118,6 +119,12 @@ button {
     font-size:12px;
 }
 
+/* fullscreen hides overlay */
+.fullscreen #overlay {
+    opacity:0;
+    pointer-events:none;
+}
+
 /* =========================
    MODAL
 ========================= */
@@ -126,9 +133,9 @@ button {
     position:fixed;
     top:0;
     left:0;
-    width:100%;
-    height:100%;
-    background:rgba(0,0,0,0.85);
+    right:0;
+    bottom:0;
+    background:rgba(0,0,0,0.8);
     display:none;
     align-items:center;
     justify-content:center;
@@ -142,14 +149,10 @@ button {
     width:80%;
 }
 
-#modal textarea {
+#modal input {
     width:100%;
-    height:80px;
-}
-
-/* FULLSCREEN CLEAN */
-.fullscreen #overlay {
-    opacity:0 !important;
+    padding:10px;
+    margin-bottom:10px;
 }
 
 </style>
@@ -160,15 +163,14 @@ button {
 <!-- OVERLAY -->
 <div id="overlay">
     <button onclick="toggleFS()">TELA CHEIA</button>
+    <button onclick="swapAction()">TROCAR</button>
     <button onclick="openReplace()">SUBSTITUIR</button>
-    <button onclick="swapMode()">TROCAR POSIÇÃO</button>
 </div>
 
 <!-- MODAL -->
 <div id="modal">
     <div id="modalContent">
-        <textarea id="newUrl" placeholder="Cole nova live..."></textarea>
-        <br><br>
+        <input id="urlInput" placeholder="Cole nova live">
         <button onclick="confirmReplace()">OK</button>
         <button onclick="closeModal()">CANCELAR</button>
     </div>
@@ -182,11 +184,10 @@ button {
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
 let selected = null;
-let swapFirst = null;
-let swapModeEnabled = false;
+let swapBuffer = null;
 
 /* =========================
-   EXTRAI ID
+   YOUTUBE ID
 ========================= */
 
 function extractID(url){
@@ -196,20 +197,39 @@ function extractID(url){
 }
 
 /* =========================
-   LAYOUT
+   OVERLAY CONTROL
+========================= */
+
+let overlayTimer;
+
+function showOverlay(){
+    let o = document.getElementById("overlay");
+    o.classList.add("show");
+
+    clearTimeout(overlayTimer);
+    overlayTimer = setTimeout(()=>{
+        o.classList.remove("show");
+    }, 2500);
+}
+
+document.body.addEventListener("touchstart", showOverlay);
+
+/* =========================
+   GRID LAYOUT
 ========================= */
 
 function layout(n){
+    let stage = document.getElementById("stage");
+
     let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
     let rows = (n <= 2) ? 1 : 2;
 
-    let stage = document.getElementById("stage");
     stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     stage.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 }
 
 /* =========================
-   RENDER SEM RELOAD TOTAL
+   RENDER
 ========================= */
 
 function load(){
@@ -218,7 +238,6 @@ function load(){
     stage.innerHTML = "";
 
     let n = Math.min(videos.length, 6);
-
     layout(n);
 
     for(let i=0;i<n;i++){
@@ -230,75 +249,97 @@ function load(){
         tile.className = "tile";
         tile.dataset.index = i;
 
+        if(selected === i) tile.classList.add("selected");
+
+        tile.onclick = ()=>{
+            selected = i;
+            load();
+            showOverlay();
+        };
+
         tile.innerHTML = `
             <iframe
                 src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
-                allow="autoplay; encrypted-media; fullscreen"
-                allowfullscreen>
+                allow="autoplay; encrypted-media; fullscreen">
             </iframe>
-
-            <div class="offline" style="display:none;">LIVE OFFLINE</div>
         `;
-
-        /* CLICK SELECT */
-        tile.onclick = () => handleSelect(i, tile);
-
-        /* DRAG */
-        tile.draggable = true;
-
-        tile.ondragstart = () => swapFirst = i;
-
-        tile.ondragover = e => e.preventDefault();
-
-        tile.ondrop = e => {
-            e.preventDefault();
-            if(swapFirst === null) return;
-
-            swap(swapFirst, i);
-            swapFirst = null;
-        };
 
         stage.appendChild(tile);
 
-        monitorLive(tile, i);
+        checkLive(tile, i);
     }
 }
 
 /* =========================
-   SELECT TILE
+   OFFLINE CHECK SIMPLES
 ========================= */
 
-function handleSelect(i, tile){
+function checkLive(tile, index){
 
-    selected = i;
+    setTimeout(()=>{
 
-    document.querySelectorAll(".tile").forEach(t => t.classList.remove("selected"));
-    tile.classList.add("selected");
+        let iframe = tile.querySelector("iframe");
 
-    showOverlay();
+        try {
+            if(!iframe.contentWindow){
+                showOffline(tile, index);
+            }
+        } catch(e){
+            showOffline(tile, index);
+        }
+
+    }, 8000);
+}
+
+function showOffline(tile, index){
+
+    let div = document.createElement("div");
+    div.className = "offline";
+    div.innerHTML = `
+        LIVE OFFLINE<br>
+        <button onclick="openReplace(${index})">SUBSTITUIR</button>
+    `;
+
+    tile.appendChild(div);
 }
 
 /* =========================
-   SWAP POSIÇÃO SEM RELOAD
+   SWAP
 ========================= */
 
-function swap(a,b){
+function swapAction(){
+
+    if(selected === null) return;
+
+    if(swapBuffer === null){
+        swapBuffer = selected;
+        return;
+    }
+
+    let a = swapBuffer;
+    let b = selected;
 
     let tmp = videos[a];
     videos[a] = videos[b];
     videos[b] = tmp;
 
-    localStorage.setItem("videos", JSON.stringify(videos));
+    swapBuffer = null;
+    selected = null;
 
+    localStorage.setItem("videos", JSON.stringify(videos));
     load();
 }
 
 /* =========================
-   SUBSTITUIR LIVE
+   MODAL REPLACE
 ========================= */
 
-function openReplace(){
-    if(selected === null) return;
+let replaceIndex = null;
+
+function openReplace(index){
+
+    replaceIndex = index ?? selected;
+
     document.getElementById("modal").style.display = "flex";
 }
 
@@ -308,11 +349,11 @@ function closeModal(){
 
 function confirmReplace(){
 
-    let url = document.getElementById("newUrl").value;
+    let url = document.getElementById("urlInput").value;
 
-    if(!url || selected === null) return;
+    if(!url) return;
 
-    videos[selected] = url;
+    videos[replaceIndex] = url;
 
     localStorage.setItem("videos", JSON.stringify(videos));
 
@@ -321,78 +362,26 @@ function confirmReplace(){
 }
 
 /* =========================
-   DETECT LIVE OFFLINE
-========================= */
-
-function monitorLive(tile, i){
-
-    let iframe = tile.querySelector("iframe");
-    let offline = tile.querySelector(".offline");
-
-    setTimeout(() => {
-
-        try {
-            if(!iframe.contentWindow){
-                offline.style.display = "flex";
-            }
-        } catch(e){
-            offline.style.display = "flex";
-        }
-
-    }, 12000);
-}
-
-/* =========================
-   OVERLAY INTELIGENTE
-========================= */
-
-let overlayTimer;
-
-function showOverlay(){
-
-    let overlay = document.getElementById("overlay");
-
-    overlay.classList.add("show");
-
-    clearTimeout(overlayTimer);
-
-    overlayTimer = setTimeout(() => {
-        overlay.classList.remove("show");
-    }, 2500);
-}
-
-document.body.addEventListener("touchstart", showOverlay);
-document.body.addEventListener("click", showOverlay);
-
-/* =========================
-   FULLSCREEN IMERSIVO
+   FULLSCREEN
 ========================= */
 
 function toggleFS(){
 
     if(!document.fullscreenElement){
-
         document.documentElement.requestFullscreen();
         document.body.classList.add("fullscreen");
-
     } else {
-
         document.exitFullscreen();
         document.body.classList.remove("fullscreen");
     }
 }
 
 /* =========================
-   SWAP MODE (FUTURO EXPAND)
+   START
 ========================= */
 
-function swapMode(){
-    swapModeEnabled = !swapModeEnabled;
-    alert("Drag ativado (arraste para trocar posições)");
-}
-
-/* INIT */
 load();
+showOverlay();
 
 </script>
 
