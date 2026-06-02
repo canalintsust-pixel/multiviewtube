@@ -3,10 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MultiViewTube</title>
+<title>MultiViewTube Pro</title>
 
 <style>
-
 body{
     margin:0;
     background:#0f0f0f;
@@ -14,13 +13,13 @@ body{
     font-family:Arial;
 }
 
-/* ÁREA FIXA DE CONTROLES */
+/* TOP BAR FIXA */
 #top{
     position:sticky;
     top:0;
-    z-index:1000;
     background:#1a1a1a;
     padding:10px;
+    z-index:10;
 }
 
 textarea{
@@ -33,16 +32,16 @@ textarea{
 
 button{
     width:100%;
-    height:40px;
+    height:42px;
     margin-top:5px;
     border:none;
-    border-radius:6px;
+    border-radius:8px;
     background:#ff0000;
     color:white;
     font-weight:bold;
 }
 
-/* GRID DAS LIVES */
+/* GRID */
 #grid{
     display:grid;
     gap:6px;
@@ -52,83 +51,65 @@ button{
 /* CARD */
 .card{
     position:relative;
-    background:black;
+    background:#000;
     border-radius:10px;
     overflow:hidden;
     aspect-ratio:16/9;
 }
 
-/* NOME */
+/* NAME */
 .name{
     position:absolute;
     top:5px;
     left:5px;
-    z-index:2;
     background:rgba(0,0,0,0.6);
     padding:3px 6px;
     font-size:12px;
+    z-index:2;
 }
 
-/* INPUT DE NOME */
-.name input{
-    background:transparent;
-    border:none;
-    color:white;
-    width:80px;
-}
-
-/* BOTÕES INTERNOS */
+/* CONTROLES */
 .controls{
     position:absolute;
     bottom:5px;
     right:5px;
-    z-index:2;
     display:flex;
     gap:5px;
+    z-index:2;
 }
 
 .controls button{
     width:auto;
-    height:25px;
+    height:28px;
     font-size:11px;
+    padding:2px 6px;
     background:#333;
 }
 
-/* IFRAME */
-iframe{
-    width:100%;
-    height:100%;
-    border:none;
-}
-
 /* FULLSCREEN OVERLAY */
-#fsOverlay{
+.fullscreen-mode{
     position:fixed;
     top:0;
     left:0;
     width:100%;
     height:100%;
     background:black;
+    z-index:999;
     display:none;
-    z-index:9999;
 }
 
-#fsGrid{
-    width:100%;
-    height:100%;
-    display:grid;
-}
-
-#fsBar{
+.fullscreen-controls{
     position:absolute;
-    top:0;
-    width:100%;
-    padding:10px;
-    background:rgba(0,0,0,0.5);
+    top:10px;
+    right:10px;
+    z-index:1000;
     display:none;
-    justify-content:space-between;
 }
 
+.fullscreen-controls button{
+    width:auto;
+    background:#ff0000;
+}
 </style>
 </head>
 
@@ -136,44 +117,40 @@ iframe{
 
 <div id="top">
 
-<textarea id="links" placeholder="Cole links juntos sem vírgula"></textarea>
+<textarea id="links" placeholder="Cole links colados juntos (sem vírgula)"></textarea>
 
 <button onclick="carregar()">CARREGAR MOSAICO</button>
-<button onclick="toggleNames()">OCULTAR/EXIBIR NOMES</button>
-<button onclick="openFullScreen()">TELA CHEIA GERAL</button>
+<button onclick="toggleNames()">OCULTAR / MOSTRAR NOMES</button>
+<button onclick="toggleFullscreenMode()">TELA CHEIA GERAL</button>
 
 </div>
 
 <div id="grid"></div>
 
-<!-- FULLSCREEN MODE -->
-<div id="fsOverlay">
-    <div id="fsBar">
-        <button onclick="closeFS()">SAIR</button>
-    </div>
-    <div id="fsGrid"></div>
+<div id="fullscreen" class="fullscreen-mode"></div>
+
+<div id="fsControls" class="fullscreen-controls">
+    <button onclick="exitFS()">Sair</button>
 </div>
 
 <script>
 
 let nomesVisiveis = true;
-let currentLinks = [];
+let fullscreenActive = false;
 
 function extrairID(url){
     let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
     return m ? m[2] : null;
 }
 
-/* ---------------- CARREGAR ---------------- */
+/* CARREGAR MOSAICO */
 function carregar(){
 
     let raw = document.getElementById("links").value.replace(/\s/g,"");
 
     let links = raw.split("https://").filter(Boolean)
-                   .map(l=>"https://"+l)
-                   .slice(0,8);
-
-    currentLinks = links;
+        .map(l=>"https://"+l)
+        .slice(0,8);
 
     let grid = document.getElementById("grid");
     grid.innerHTML="";
@@ -189,78 +166,111 @@ function carregar(){
         let card = document.createElement("div");
         card.className="card";
 
+        card.setAttribute("data-url", url);
+        card.setAttribute("data-index", i);
+
         card.innerHTML = `
-            <div class="name">
-                <input value="Live ${i+1}" onchange="rename(this)">
+            <div class="name" contenteditable="true">Live ${i+1}</div>
+
+            <div class="controls">
+
+                <button onclick="moveLeft(this)">⬅</button>
+                <button onclick="moveRight(this)">➡</button>
+                <button onclick="reload(this)">🔄</button>
+
             </div>
 
-            <iframe src="https://www.youtube.com/embed/${id}?enablejsapi=1"
-            allowfullscreen></iframe>
+            <iframe
+                src="https://www.youtube.com/embed/${id}?autoplay=1"
+                allow="autoplay; encrypted-media"
+                allowfullscreen>
+            </iframe>
         `;
 
         grid.appendChild(card);
     });
 }
 
-/* ---------------- NOME ---------------- */
-function rename(input){
-    input.parentElement.innerHTML =
-        `<input value="${input.value}" onchange="rename(this)">`;
+/* TROCAR LINK (reload individual) */
+function reload(btn){
+
+    let card = btn.closest(".card");
+    let iframe = card.querySelector("iframe");
+
+    let url = card.getAttribute("data-url");
+    let id = extrairID(url);
+
+    iframe.src = "https://www.youtube.com/embed/"+id+"?autoplay=1";
 }
 
-/* ---------------- OCULTAR NOMES ---------------- */
+/* TROCA DE POSIÇÃO */
+function moveLeft(btn){
+
+    let card = btn.closest(".card");
+    let prev = card.previousElementSibling;
+
+    if(prev){
+        card.parentNode.insertBefore(card, prev);
+    }
+}
+
+function moveRight(btn){
+
+    let card = btn.closest(".card");
+    let next = card.nextElementSibling;
+
+    if(next){
+        card.parentNode.insertBefore(next, card);
+    }
+}
+
+/* NOMES */
 function toggleNames(){
+
     nomesVisiveis = !nomesVisiveis;
 
     document.querySelectorAll(".name")
-        .forEach(n=>{
-            n.style.display = nomesVisiveis ? "block" : "none";
-        });
+    .forEach(n=>{
+        n.style.display = nomesVisiveis ? "block" : "none";
+    });
 }
 
-/* ---------------- FULLSCREEN GERAL ---------------- */
-function openFullScreen(){
+/* FULLSCREEN GERAL */
+function toggleFullscreenMode(){
 
-    let fs = document.getElementById("fsOverlay");
+    let fs = document.getElementById("fullscreen");
+    let controls = document.getElementById("fsControls");
     let grid = document.getElementById("grid");
-    let fsGrid = document.getElementById("fsGrid");
 
-    fsGrid.innerHTML = grid.innerHTML;
+    if(!fullscreenActive){
 
-    fs.style.display="block";
+        fullscreenActive = true;
 
-    document.getElementById("fsBar").style.display="flex";
-}
+        fs.innerHTML = grid.innerHTML;
 
-function closeFS(){
-    document.getElementById("fsOverlay").style.display="none";
-}
+        fs.style.display = "block";
+        controls.style.display = "block";
 
-/* ---------------- TROCA DE POSIÇÃO (SIMPLES) ---------------- */
-/* (versão leve: swap por clique duplo) */
+        document.body.style.overflow="hidden";
 
-let selected = null;
+    }else{
 
-document.addEventListener("click", function(e){
-
-    let card = e.target.closest(".card");
-
-    if(!card) return;
-
-    if(!selected){
-        selected = card;
-        card.style.border="2px solid red";
-    } else {
-
-        let temp = card.innerHTML;
-        card.innerHTML = selected.innerHTML;
-        selected.innerHTML = temp;
-
-        selected.style.border="none";
-        selected = null;
+        exitFS();
     }
+}
 
-});
+function exitFS(){
+
+    let fs = document.getElementById("fullscreen");
+    let controls = document.getElementById("fsControls");
+
+    fs.style.display = "none";
+    controls.style.display = "none";
+
+    fullscreenActive = false;
+
+    document.body.style.overflow="auto";
+}
 
 </script>
 
