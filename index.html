@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <title>MultiViewTube</title>
 
@@ -23,15 +23,16 @@ body{
 
 textarea{
     width:100%;
-    height:80px;
+    height:90px;
     border-radius:8px;
+    border:none;
     padding:8px;
     font-size:14px;
 }
 
 button{
     width:100%;
-    padding:12px;
+    height:45px;
     margin-top:6px;
     border:none;
     border-radius:8px;
@@ -51,7 +52,7 @@ button{
     background:#000;
     border-radius:10px;
     overflow:hidden;
-    height:220px;
+    aspect-ratio:16/9;
 }
 
 .name{
@@ -61,37 +62,44 @@ button{
     background:rgba(0,0,0,0.6);
     padding:3px 6px;
     font-size:12px;
-    z-index:10;
+    z-index:2;
 }
 
 .controls{
     position:absolute;
     bottom:5px;
-    left:5px;
-    z-index:10;
+    right:5px;
+    display:flex;
+    gap:5px;
+    z-index:2;
 }
 
 .controls button{
     width:auto;
-    padding:4px 6px;
+    height:28px;
     font-size:11px;
-    margin-right:3px;
-    border-radius:4px;
+    padding:2px 6px;
+    background:#333;
+    border-radius:5px;
+}
+
+iframe{
+    width:100%;
+    height:100%;
+    border:none;
 }
 </style>
-
 </head>
 
 <body>
 
 <div id="top">
 
-<textarea id="links"
-placeholder="Cole links colados sem espaço ou com vários links"></textarea>
+<textarea id="links" placeholder="Cole links colados juntos (sem vírgula)"></textarea>
 
 <button onclick="carregar()">CARREGAR MOSAICO</button>
 
-<button onclick="toggleNames()">OCULTAR/NOMES</button>
+<button onclick="toggleNames()">OCULTAR/NOMES FULLSCREEN</button>
 
 </div>
 
@@ -99,8 +107,7 @@ placeholder="Cole links colados sem espaço ou com vários links"></textarea>
 
 <script>
 
-let players = [];
-let showNames = true;
+let nomesVisiveis = true;
 
 function extrairID(url){
     let match = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
@@ -111,64 +118,66 @@ function carregar(){
 
     let raw = document.getElementById("links").value.replace(/\s/g,"");
 
-    let links = raw.split("https://").filter(Boolean).map(l=>"https://"+l);
-
-    links = links.slice(0,8);
-
-    let cols = links.length <= 2 ? 2 : (links.length <= 4 ? 2 : 4);
+    let links = raw.split("https://").filter(Boolean)
+                   .map(l=>"https://"+l)
+                   .slice(0,8);
 
     let grid = document.getElementById("grid");
-    grid.innerHTML = "";
-    grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+    grid.innerHTML="";
 
-    players = [];
+    let cols = links.length<=2 ? 2 : (links.length<=4 ? 2 : 4);
+
+    grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
 
     links.forEach((url,i)=>{
 
         let id = extrairID(url);
 
         let card = document.createElement("div");
-        card.className = "card";
+        card.className="card";
 
         card.innerHTML = `
-            <div class="name" id="name-${i}">Live ${i+1}</div>
+            <div class="name">Live ${i+1}</div>
+
+            <div class="controls">
+                <button onclick="mute(this)">🔇</button>
+                <button onclick="fullscreen(this)">⛶</button>
+            </div>
 
             <iframe
-                width="100%"
-                height="100%"
-                src="https://www.youtube.com/embed/${id}"
+                src="https://www.youtube.com/embed/${id}?enablejsapi=1"
                 allow="autoplay; encrypted-media"
                 allowfullscreen>
             </iframe>
-
-            <div class="controls">
-                <button onclick="mute(${i})">🔇</button>
-                <button onclick="fullscreen(${i})">⛶</button>
-            </div>
         `;
 
         grid.appendChild(card);
-
-        players.push(card);
     });
 }
 
-function mute(i){
-    alert("Mute ainda será ligado via API do YouTube (próxima etapa)");
+function mute(btn){
+    alert("Mute depende da API do YouTube (próxima etapa avançada)");
 }
 
-function fullscreen(i){
-    players[i].requestFullscreen();
+function fullscreen(btn){
+
+    let card = btn.closest(".card");
+
+    if (!document.fullscreenElement) {
+        card.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
 }
 
 function toggleNames(){
 
-    showNames = !showNames;
+    nomesVisiveis = !nomesVisiveis;
 
-    players.forEach((p,i)=>{
-        let el = document.getElementById("name-"+i);
-        if(el) el.style.display = showNames ? "block" : "none";
-    });
+    document.querySelectorAll(".name")
+        .forEach(n=>{
+            n.style.display = nomesVisiveis ? "block" : "none";
+        });
 }
 
 </script>
