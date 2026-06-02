@@ -6,154 +6,174 @@
 <title>MultiViewTube</title>
 
 <style>
+
 body{
     margin:0;
     background:#0f0f0f;
     color:white;
     font-family:Arial;
-    overflow:hidden;
 }
 
-/* TELA CONFIG */
-#config{
+/* ÁREA FIXA DE CONTROLES */
+#top{
+    position:sticky;
+    top:0;
+    z-index:1000;
+    background:#1a1a1a;
     padding:10px;
-    height:100vh;
-    display:flex;
-    flex-direction:column;
 }
 
 textarea{
-    flex:1;
-    resize:none;
-    border-radius:10px;
+    width:100%;
+    height:80px;
+    border-radius:8px;
     border:none;
-    padding:10px;
+    padding:8px;
 }
 
 button{
-    height:45px;
-    margin-top:8px;
+    width:100%;
+    height:40px;
+    margin-top:5px;
     border:none;
-    border-radius:8px;
+    border-radius:6px;
     background:#ff0000;
     color:white;
     font-weight:bold;
 }
 
-/* TELA MOSAICO */
-#app{
-    display:none;
-    height:100vh;
-    position:relative;
-}
-
+/* GRID DAS LIVES */
 #grid{
     display:grid;
-    gap:5px;
-    width:100%;
-    height:100%;
-    padding:5px;
+    gap:6px;
+    padding:6px;
 }
 
 /* CARD */
 .card{
     position:relative;
     background:black;
-    aspect-ratio:16/9;
+    border-radius:10px;
     overflow:hidden;
+    aspect-ratio:16/9;
 }
 
-.card iframe{
-    width:100%;
-    height:100%;
-    border:none;
-}
-
-/* NOMES */
+/* NOME */
 .name{
     position:absolute;
     top:5px;
     left:5px;
+    z-index:2;
     background:rgba(0,0,0,0.6);
     padding:3px 6px;
     font-size:12px;
 }
 
-/* CONTROLES GLOBAIS */
-#controls{
+/* INPUT DE NOME */
+.name input{
+    background:transparent;
+    border:none;
+    color:white;
+    width:80px;
+}
+
+/* BOTÕES INTERNOS */
+.controls{
     position:absolute;
-    top:10px;
-    right:10px;
-    z-index:10;
+    bottom:5px;
+    right:5px;
+    z-index:2;
     display:flex;
     gap:5px;
 }
 
-.ctrl-btn{
-    background:#222;
+.controls button{
+    width:auto;
+    height:25px;
+    font-size:11px;
+    background:#333;
+}
+
+/* IFRAME */
+iframe{
+    width:100%;
+    height:100%;
     border:none;
-    color:white;
-    padding:6px 8px;
-    border-radius:6px;
-    font-size:12px;
 }
 
-/* FULLSCREEN MODE */
-.fullscreenMode #controls{
-    opacity:0;
+/* FULLSCREEN OVERLAY */
+#fsOverlay{
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:black;
+    display:none;
+    z-index:9999;
 }
 
-.fullscreenMode.showControls #controls{
-    opacity:1;
+#fsGrid{
+    width:100%;
+    height:100%;
+    display:grid;
 }
+
+#fsBar{
+    position:absolute;
+    top:0;
+    width:100%;
+    padding:10px;
+    background:rgba(0,0,0,0.5);
+    display:none;
+    justify-content:space-between;
+}
+
 </style>
 </head>
 
 <body>
 
-<!-- CONFIG -->
-<div id="config">
+<div id="top">
 
-<textarea id="links" placeholder="Cole links colados juntos"></textarea>
+<textarea id="links" placeholder="Cole links juntos sem vírgula"></textarea>
 
 <button onclick="carregar()">CARREGAR MOSAICO</button>
+<button onclick="toggleNames()">OCULTAR/EXIBIR NOMES</button>
+<button onclick="openFullScreen()">TELA CHEIA GERAL</button>
 
-</div>
-
-<!-- MOSAICO -->
-<div id="app">
-
-<div id="controls">
-    <button class="ctrl-btn" onclick="toggleNames()">👁 Nomes</button>
-    <button class="ctrl-btn" onclick="fullscreenAll()">⛶ Full</button>
-    <button class="ctrl-btn" onclick="back()">↩</button>
 </div>
 
 <div id="grid"></div>
 
+<!-- FULLSCREEN MODE -->
+<div id="fsOverlay">
+    <div id="fsBar">
+        <button onclick="closeFS()">SAIR</button>
+    </div>
+    <div id="fsGrid"></div>
 </div>
 
 <script>
 
 let nomesVisiveis = true;
+let currentLinks = [];
 
 function extrairID(url){
     let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
     return m ? m[2] : null;
 }
 
-/* ENTRAR MOSAICO */
+/* ---------------- CARREGAR ---------------- */
 function carregar(){
 
     let raw = document.getElementById("links").value.replace(/\s/g,"");
 
-    let links = raw.split("https://")
-        .filter(Boolean)
-        .map(l=>"https://"+l)
-        .slice(0,8);
+    let links = raw.split("https://").filter(Boolean)
+                   .map(l=>"https://"+l)
+                   .slice(0,8);
 
-    document.getElementById("config").style.display="none";
-    document.getElementById("app").style.display="block";
+    currentLinks = links;
 
     let grid = document.getElementById("grid");
     grid.innerHTML="";
@@ -170,41 +190,26 @@ function carregar(){
         card.className="card";
 
         card.innerHTML = `
-            <div class="name">Live ${i+1}</div>
+            <div class="name">
+                <input value="Live ${i+1}" onchange="rename(this)">
+            </div>
 
-            <iframe
-                src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0"
-                allowfullscreen>
-            </iframe>
+            <iframe src="https://www.youtube.com/embed/${id}?enablejsapi=1"
+            allowfullscreen></iframe>
         `;
 
         grid.appendChild(card);
     });
 }
 
-/* VOLTAR */
-function back(){
-    document.getElementById("config").style.display="flex";
-    document.getElementById("app").style.display="none";
+/* ---------------- NOME ---------------- */
+function rename(input){
+    input.parentElement.innerHTML =
+        `<input value="${input.value}" onchange="rename(this)">`;
 }
 
-/* FULLSCREEN GERAL */
-function fullscreenAll(){
-
-    let app = document.getElementById("app");
-
-    if (!document.fullscreenElement) {
-        app.requestFullscreen();
-        document.body.classList.add("fullscreenMode");
-    } else {
-        document.exitFullscreen();
-        document.body.classList.remove("fullscreenMode");
-    }
-}
-
-/* MOSTRAR / OCULTAR NOMES */
+/* ---------------- OCULTAR NOMES ---------------- */
 function toggleNames(){
-
     nomesVisiveis = !nomesVisiveis;
 
     document.querySelectorAll(".name")
@@ -213,9 +218,48 @@ function toggleNames(){
         });
 }
 
-/* MOSTRAR CONTROLES NO TOUCH (FULLSCREEN) */
-document.addEventListener("touchstart", ()=>{
-    document.body.classList.toggle("showControls");
+/* ---------------- FULLSCREEN GERAL ---------------- */
+function openFullScreen(){
+
+    let fs = document.getElementById("fsOverlay");
+    let grid = document.getElementById("grid");
+    let fsGrid = document.getElementById("fsGrid");
+
+    fsGrid.innerHTML = grid.innerHTML;
+
+    fs.style.display="block";
+
+    document.getElementById("fsBar").style.display="flex";
+}
+
+function closeFS(){
+    document.getElementById("fsOverlay").style.display="none";
+}
+
+/* ---------------- TROCA DE POSIÇÃO (SIMPLES) ---------------- */
+/* (versão leve: swap por clique duplo) */
+
+let selected = null;
+
+document.addEventListener("click", function(e){
+
+    let card = e.target.closest(".card");
+
+    if(!card) return;
+
+    if(!selected){
+        selected = card;
+        card.style.border="2px solid red";
+    } else {
+
+        let temp = card.innerHTML;
+        card.innerHTML = selected.innerHTML;
+        selected.innerHTML = temp;
+
+        selected.style.border="none";
+        selected = null;
+    }
+
 });
 
 </script>
