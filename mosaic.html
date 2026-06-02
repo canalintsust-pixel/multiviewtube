@@ -2,152 +2,203 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mosaico</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mosaic</title>
 
 <style>
 body{
     margin:0;
-    background:#0f0f0f;
+    background:#000;
     color:white;
     font-family:Arial;
 }
 
-/* barra superior */
-#topbar{
-    padding:10px;
-    background:#1c1c1c;
+.topbar{
     display:flex;
-    gap:10px;
-    align-items:center;
     justify-content:space-between;
+    padding:10px;
+    background:#111;
+    position:sticky;
+    top:0;
+    z-index:10;
 }
 
 button{
-    padding:10px;
-    background:#333;
-    color:white;
     border:none;
+    padding:8px 12px;
+    border-radius:6px;
+    background:#ff0000;
+    color:white;
 }
 
-/* grid principal */
 #grid{
     display:grid;
-    gap:4px;
-    padding:4px;
-    height:calc(100vh - 60px);
+    gap:5px;
+    padding:5px;
 }
 
-/* container da live */
 .tile{
-    background:black;
     position:relative;
-    overflow:hidden;
+    width:100%;
     aspect-ratio:16/9;
-    border:1px solid #333;
+    background:#111;
+    border-radius:8px;
+    overflow:hidden;
+    border:1px solid #222;
+    cursor:grab;
 }
 
-/* iframe ocupa tudo */
+.tile.dragging{
+    opacity:0.5;
+}
+
 iframe{
     width:100%;
     height:100%;
-    border:0;
-}
-
-/* botão trocar link */
-.swap{
-    position:absolute;
-    bottom:5px;
-    right:5px;
-    font-size:10px;
-    background:#000a;
+    border:none;
 }
 </style>
 </head>
 
 <body>
 
-<div id="topbar">
-<button onclick="fullscreen()">TELA CHEIA</button>
-<button onclick="shuffle()">TROCAR POSIÇÃO</button>
-<button onclick="reloadLives()">RELOAD</button>
+<div class="topbar">
+<button onclick="toggleFS()">FULLSCREEN</button>
+<button onclick="reset()">RESET</button>
 </div>
 
 <div id="grid"></div>
 
 <script>
 
-let links = [];
+let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
-// pega links da URL
-function load(){
+let dragIndex = null;
 
-    let params = new URLSearchParams(window.location.search);
-    let raw = params.get("data") || "";
-
-    raw = raw.replace(/\s/g,"");
-
-    links = raw.split("https://").filter(Boolean)
-               .map(x => "https://" + x)
-               .slice(0,6);
-
-    render();
-}
-
-function getId(url){
+function extractID(url){
     let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
     return m ? m[2] : null;
 }
 
-function render(){
+function getCols(n){
+    if(n <= 1) return 1;
+    if(n == 2) return 2;
+    if(n <= 4) return 2;
+    return 3;
+}
+
+function layout(cols){
+    document.getElementById("grid")
+        .style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+}
+
+function load(){
 
     let grid = document.getElementById("grid");
     grid.innerHTML = "";
 
-    let cols = 1;
-    if(links.length == 2) cols = 2;
-    else if(links.length <= 4) cols = 2;
-    else cols = 3;
+    let n = Math.min(videos.length, 6);
+    layout(getCols(n));
 
-    grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+    for(let i=0;i<n;i++){
 
-    links.forEach((url,i)=>{
-
-        let id = getId(url);
+        let id = extractID(videos[i]);
 
         let div = document.createElement("div");
         div.className = "tile";
+        div.draggable = true;
+        div.dataset.index = i;
 
         div.innerHTML = `
-            <iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1"></iframe>
-            <button class="swap" onclick="swap(${i})">swap</button>
+            <iframe src="https://www.youtube.com/embed/${id}"
+            allow="autoplay; encrypted-media"
+            allowfullscreen></iframe>
         `;
 
+        // DRAG START
+        div.addEventListener("dragstart", e=>{
+            dragIndex = i;
+            div.classList.add("dragging");
+        });
+
+        div.addEventListener("dragend", e=>{
+            div.classList.remove("dragging");
+        });
+
+        div.addEventListener("dragover", e=>{
+            e.preventDefault();
+        });
+
+        // DROP (troca posição)
+        div.addEventListener("drop", e=>{
+            e.preventDefault();
+
+            let targetIndex = i;
+
+            let temp = videos[dragIndex];
+            videos[dragIndex] = videos[targetIndex];
+            videos[targetIndex] = temp;
+
+            localStorage.setItem("videos", JSON.stringify(videos));
+
+            load();
+        });
+
         grid.appendChild(div);
+    }
+
+    // detectar vídeos quebrados (simples fallback)
+    setTimeout(checkVideos, 5000);
+}
+
+function checkVideos(){
+
+    let iframes = document.querySelectorAll("iframe");
+
+    iframes.forEach((frame, i)=>{
+
+        frame.onerror = ()=>{
+            replaceVideo(i);
+        };
+
+        // fallback visual simples
+        try{
+            if(!frame.contentWindow){
+                replaceVideo(i);
+            }
+        }catch(e){
+            replaceVideo(i);
+        }
+
     });
 }
 
-function swap(i){
+function replaceVideo(index){
 
-    let j = (i+1) % links.length;
-    [links[i], links[j]] = [links[j], links[i]];
-    render();
+    let newUrl = prompt("Live caiu. Cole nova URL:");
+
+    if(newUrl){
+
+        videos[index] = newUrl;
+        localStorage.setItem("videos", JSON.stringify(videos));
+        load();
+    }
 }
 
-function shuffle(){
-    links.sort(()=>Math.random()-0.5);
-    render();
+function toggleFS(){
+    if(!document.fullscreenElement){
+        document.documentElement.requestFullscreen();
+    }else{
+        document.exitFullscreen();
+    }
 }
 
-function fullscreen(){
-    document.documentElement.requestFullscreen();
+function reset(){
+    localStorage.removeItem("videos");
+    window.location.href = "index.html";
 }
 
-function reloadLives(){
-    render();
-}
-
-window.onload = load;
+load();
 
 </script>
 
