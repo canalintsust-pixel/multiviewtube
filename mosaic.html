@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
-<title>MultiView Mosaic</title>
+<title>MultiView Mosaic V3</title>
 
 <style>
 
@@ -21,7 +21,7 @@ html, body {
 }
 
 /* =========================
-   STAGE 16:9 SAFE CANVAS
+   STAGE 16:9 SAFE
 ========================= */
 
 #stage {
@@ -42,7 +42,7 @@ html, body {
 }
 
 /* =========================
-   TILE 16:9 FIX
+   TILE
 ========================= */
 
 .tile {
@@ -51,13 +51,18 @@ html, body {
     height:100%;
     background:#000;
     overflow:hidden;
-    aspect-ratio:16/9;
 }
 
-iframe {
+.tile iframe {
     width:100%;
     height:100%;
     border:none;
+}
+
+/* destaque real */
+.tile.main {
+    border:2px solid #00ff88;
+    transform:scale(1.02);
 }
 
 /* =========================
@@ -92,119 +97,18 @@ button {
     font-size:12px;
 }
 
-/* =========================
-   MODAL
-========================= */
-
-.modal {
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.85);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:10000;
-}
-
-.modalContent {
-    position:relative;
-    background:#111;
-    padding:15px;
-    border-radius:10px;
-    width:85%;
-    max-height:80%;
-    overflow:auto;
-    color:white;
-}
-
-.gridList {
-    display:grid;
-    grid-template-columns:repeat(2, 1fr);
-    gap:8px;
-}
-
-.item {
-    background:#222;
-    padding:10px;
-    border-radius:6px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    transition:0.2s;
-    border:2px solid transparent;
-}
-
-.item.selected {
-    border:2px solid #00ff88;
-    background:#2a2a2a;
-}
-
-input[type="checkbox"]{
-    transform:scale(1.4);
-}
-
-.closeBtn{
-    position:absolute;
-    top:8px;
-    right:8px;
-    background:#444;
-    border:none;
-    color:white;
-    padding:5px 10px;
-    border-radius:6px;
-    font-size:12px;
-}
-
 </style>
 </head>
 
 <body>
 
-<!-- OVERLAY -->
 <div id="overlay">
     <button onclick="openSwap()">TROCAR</button>
     <button onclick="openReplace()">SUBSTITUIR</button>
     <button onclick="cycleLayout()">LAYOUT</button>
 </div>
 
-<!-- STAGE -->
 <div id="stage"></div>
-
-<!-- SWAP MODAL -->
-<div id="swapModal" class="modal">
-    <div class="modalContent">
-        <button class="closeBtn" onclick="closeSwap()">✕</button>
-
-        <h3>Trocar posições</h3>
-        <p>Selecione 2 lives</p>
-
-        <div id="swapList" class="gridList"></div>
-
-        <button id="swapBtn" onclick="confirmSwap()" disabled>
-            TROCAR POSIÇÃO
-        </button>
-
-        <button onclick="closeSwap()">CANCELAR</button>
-    </div>
-</div>
-
-<!-- REPLACE MODAL -->
-<div id="replaceModal" class="modal">
-    <div class="modalContent">
-        <button class="closeBtn" onclick="closeReplace()">✕</button>
-
-        <h3>Substituir live</h3>
-
-        <select id="replaceSelect"></select>
-
-        <input id="replaceInput"
-               placeholder="Cole nova URL"
-               style="width:100%;padding:8px;margin-top:10px;">
-
-        <button onclick="confirmReplace()">OK</button>
-        <button onclick="closeReplace()">CANCELAR</button>
-    </div>
-</div>
 
 <script>
 
@@ -216,10 +120,9 @@ let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
 let layoutMode = 0;
 let mainIndex = 0;
-let swapSelected = [];
 
 /* =========================
-   OVERLAY AUTO HIDE
+   OVERLAY
 ========================= */
 
 let timer;
@@ -229,15 +132,13 @@ function showOverlay(){
     o.classList.add("show");
 
     clearTimeout(timer);
-    timer = setTimeout(()=>{
-        o.classList.remove("show");
-    }, 2500);
+    timer = setTimeout(()=>o.classList.remove("show"), 2500);
 }
 
 document.body.addEventListener("touchstart", showOverlay);
 
 /* =========================
-   YOUTUBE ID
+   YOUTUBE
 ========================= */
 
 function extractID(url){
@@ -247,7 +148,7 @@ function extractID(url){
 }
 
 /* =========================
-   LAYOUT ENGINE
+   LAYOUT SWITCH
 ========================= */
 
 function cycleLayout(){
@@ -256,7 +157,7 @@ function cycleLayout(){
 }
 
 /* =========================
-   AUTO ROTATE
+   AUTO ROTATE (MODE 3)
 ========================= */
 
 setInterval(()=>{
@@ -267,7 +168,7 @@ setInterval(()=>{
 }, 180000);
 
 /* =========================
-   APPLY LAYOUT
+   APPLY LAYOUT REAL
 ========================= */
 
 function applyLayout(n){
@@ -275,12 +176,8 @@ function applyLayout(n){
     let stage = document.getElementById("stage");
 
     if(layoutMode === 0){
-
-        let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
-        let rows = (n <= 2) ? 1 : 2;
-
-        stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-        stage.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+        stage.style.gridTemplateColumns = (n <= 2 ? "2fr 2fr" : "repeat(3, 1fr)");
+        stage.style.gridTemplateRows = (n <= 2 ? "1fr" : "repeat(2, 1fr)");
         return;
     }
 
@@ -291,7 +188,7 @@ function applyLayout(n){
     }
 
     if(layoutMode === 2){
-        stage.style.gridTemplateColumns = "repeat(3, 1fr)";
+        stage.style.gridTemplateColumns = "repeat(2, 1fr)";
         stage.style.gridTemplateRows = "2fr 1fr";
         return;
     }
@@ -323,7 +220,13 @@ function load(){
         let tile = document.createElement("div");
         tile.className = "tile";
 
-        let isMain = (layoutMode === 3 && i === mainIndex);
+        let isMain = (
+            layoutMode === 3 ? i === mainIndex :
+            layoutMode === 1 ? i === 0 :
+            false
+        );
+
+        if(isMain) tile.classList.add("main");
 
         tile.innerHTML = `
             <iframe
@@ -334,115 +237,6 @@ function load(){
 
         stage.appendChild(tile);
     }
-}
-
-/* =========================
-   SWAP
-========================= */
-
-function openSwap(){
-
-    let modal = document.getElementById("swapModal");
-    let list = document.getElementById("swapList");
-
-    list.innerHTML = "";
-    swapSelected = [];
-
-    videos.forEach((v,i)=>{
-
-        let div = document.createElement("div");
-        div.className = "item";
-
-        div.innerHTML = `
-            Live ${i+1}
-            <input type="checkbox" onchange="toggleSwap(${i}, this)">
-        `;
-
-        list.appendChild(div);
-    });
-
-    document.getElementById("swapBtn").disabled = true;
-    modal.style.display = "flex";
-}
-
-function toggleSwap(index, el){
-
-    let items = document.querySelectorAll(".item");
-
-    if(el.checked){
-
-        if(swapSelected.length === 2){
-            let removed = swapSelected.shift();
-            document.querySelectorAll("input")[removed].checked = false;
-            items[removed].classList.remove("selected");
-        }
-
-        swapSelected.push(index);
-        items[index].classList.add("selected");
-
-    } else {
-        swapSelected = swapSelected.filter(i => i !== index);
-        items[index].classList.remove("selected");
-    }
-
-    document.getElementById("swapBtn").disabled = swapSelected.length !== 2;
-}
-
-function confirmSwap(){
-
-    let a = swapSelected[0];
-    let b = swapSelected[1];
-
-    let tmp = videos[a];
-    videos[a] = videos[b];
-    videos[b] = tmp;
-
-    localStorage.setItem("videos", JSON.stringify(videos));
-
-    closeSwap();
-    load();
-}
-
-function closeSwap(){
-    document.getElementById("swapModal").style.display = "none";
-}
-
-/* =========================
-   REPLACE
-========================= */
-
-function openReplace(){
-
-    let sel = document.getElementById("replaceSelect");
-    sel.innerHTML = "";
-
-    videos.forEach((v,i)=>{
-        let opt = document.createElement("option");
-        opt.value = i;
-        opt.innerText = `Live ${i+1}`;
-        sel.appendChild(opt);
-    });
-
-    document.getElementById("replaceModal").style.display = "flex";
-}
-
-function confirmReplace(){
-
-    let i = document.getElementById("replaceSelect").value;
-    let url = document.getElementById("replaceInput").value;
-
-    if(!url) return;
-
-    videos[i] = url;
-
-    localStorage.setItem("videos", JSON.stringify(videos));
-
-    closeReplace();
-    load();
-}
-
-function closeReplace(){
-    document.getElementById("replaceModal").style.display = "none";
 }
 
 /* =========================
