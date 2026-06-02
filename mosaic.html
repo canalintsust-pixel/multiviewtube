@@ -2,74 +2,101 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Mosaic Fix</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+<title>MultiView Mosaic</title>
 
 <style>
+
+/* =========================
+   BASE IMERSIVO
+========================= */
 
 html, body {
     margin:0;
     padding:0;
     background:#000;
-    height:100%;
     overflow:hidden;
+    height:100%;
     font-family:Arial;
 }
 
-/* topbar */
+/* =========================
+   TOPBAR (OCULTA NO FULLSCREEN FUTURO)
+========================= */
+
 .topbar{
+    display:flex;
+    justify-content:space-between;
+    padding:8px;
+    background:#111;
     position:fixed;
     top:0;
     left:0;
     right:0;
-    height:45px;
-    background:#111;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:0 10px;
     z-index:10;
 }
 
 button{
-    background:#ff0000;
-    color:#fff;
     border:none;
-    padding:6px 10px;
+    padding:8px 12px;
     border-radius:6px;
+    background:#ff0000;
+    color:white;
+    font-size:13px;
 }
 
-/* GRID */
+/* =========================
+   GRID PRINCIPAL
+========================= */
+
 #grid{
-    position:absolute;
-    top:45px;
-    left:0;
-    right:0;
-    bottom:0;
     display:grid;
     gap:4px;
-    padding:4px;
+    width:100vw;
+    height:100vh;
+    padding-top:45px;
+    box-sizing:border-box;
 }
 
-/* TILE 16:9 */
+/* =========================
+   TILE 16:9 REAL
+========================= */
+
 .tile{
     position:relative;
+    width:100%;
+    aspect-ratio:16/9;
     background:#111;
-    border-radius:10px;
+    border-radius:8px;
     overflow:hidden;
+    border:1px solid #222;
+    cursor:grab;
 }
 
-/* iframe */
+/* highlight drag */
+.tile.dragging{
+    opacity:0.5;
+}
+
+/* iframe full */
 iframe{
+    position:absolute;
     width:100%;
     height:100%;
-    border:0;
+    border:none;
 }
 
-/* debug */
-.debug{
-    color:white;
-    padding:20px;
+/* =========================
+   FULLSCREEN MODE
+========================= */
+
+.fullscreen {
+    padding-top:0 !important;
+}
+
+.fullscreen .topbar{
+    display:none;
 }
 
 </style>
@@ -78,7 +105,7 @@ iframe{
 <body>
 
 <div class="topbar">
-<button onclick="toggleFS()">FULLSCREEN</button>
+<button onclick="toggleFS()">⛶ FULLSCREEN</button>
 <button onclick="reset()">RESET</button>
 </div>
 
@@ -86,102 +113,172 @@ iframe{
 
 <script>
 
+/* =========================
+   DADOS
+========================= */
+
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
+let dragIndex = null;
 
 /* =========================
-   EXTRAÇÃO MAIS FORTE
+   EXTRAI ID YOUTUBE
 ========================= */
+
 function extractID(url){
 
     if(!url) return null;
 
-    let match = url.match(
-        /(youtu\.be\/|v=|\/live\/)([a-zA-Z0-9_-]+)/
-    );
+    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
 
-    return match ? match[2] : null;
+    return m ? m[2] : null;
 }
 
 /* =========================
-   LAYOUT SIMPLES E SEGURO
+   LAYOUT EXATO PEDIDO
 ========================= */
+
 function getCols(n){
 
-    if(n <= 1) return 1;
-    if(n == 2) return 2;
-    if(n <= 4) return 2;
+    // 1 → 1x1
+    if(n === 1) return 1;
+
+    // 2 → 2x1
+    if(n === 2) return 2;
+
+    // 3 → 4 colunas (layout especial)
+    if(n === 3) return 4;
+
+    // 4 → 2x2
+    if(n === 4) return 2;
+
+    // 5 → 6 colunas (3 em cima, 2 embaixo centralizados)
+    if(n === 5) return 6;
+
+    // 6 → 3x2
     return 3;
 }
 
 /* =========================
-   CRIA TILE
+   APLICAR GRID
 ========================= */
-function createTile(url){
 
-    let id = extractID(url);
+function applyLayout(n){
 
-    let div = document.createElement("div");
-    div.className = "tile";
+    let grid = document.getElementById("grid");
 
-    if(!id){
-        div.innerHTML = "<div style='color:red;padding:10px'>LINK INVÁLIDO</div>";
-        return div;
-    }
+    let cols = getCols(n);
 
-    div.innerHTML = `
-        <iframe
-            src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0&origin=${location.origin}"
-            allow="autoplay; encrypted-media; fullscreen"
-            allowfullscreen>
-        </iframe>
-    `;
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 
-    return div;
 }
 
 /* =========================
-   LOAD PRINCIPAL
+   RENDER PRINCIPAL
 ========================= */
+
 function load(){
 
     let grid = document.getElementById("grid");
     grid.innerHTML = "";
 
-    // 🔴 DEBUG VISUAL
-    if(!videos || videos.length === 0){
-        grid.innerHTML = "<div class='debug'>Nenhum vídeo carregado.<br>Volte ao index.html e cole links.</div>";
-        return;
-    }
-
     let n = Math.min(videos.length, 6);
 
-    grid.style.gridTemplateColumns =
-        `repeat(${getCols(n)}, 1fr)`;
+    applyLayout(n);
 
     for(let i=0;i<n;i++){
-        grid.appendChild(createTile(videos[i]));
+
+        let id = extractID(videos[i]);
+
+        if(!id) continue;
+
+        let div = document.createElement("div");
+        div.className = "tile";
+        div.draggable = true;
+        div.dataset.index = i;
+
+        div.innerHTML = `
+            <iframe
+                src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowfullscreen>
+            </iframe>
+        `;
+
+        /* =========================
+           DRAG START
+        ========================= */
+
+        div.addEventListener("dragstart", (e)=>{
+            dragIndex = i;
+            div.classList.add("dragging");
+        });
+
+        div.addEventListener("dragend", ()=>{
+            div.classList.remove("dragging");
+        });
+
+        div.addEventListener("dragover", (e)=>{
+            e.preventDefault();
+        });
+
+        /* =========================
+           DROP SWAP
+        ========================= */
+
+        div.addEventListener("drop", (e)=>{
+            e.preventDefault();
+
+            let targetIndex = i;
+
+            if(dragIndex === null) return;
+
+            let temp = videos[dragIndex];
+            videos[dragIndex] = videos[targetIndex];
+            videos[targetIndex] = temp;
+
+            localStorage.setItem("videos", JSON.stringify(videos));
+
+            load();
+        });
+
+        grid.appendChild(div);
     }
 }
 
 /* =========================
-   FULLSCREEN
+   FULLSCREEN IMERSIVO
 ========================= */
+
 function toggleFS(){
 
     if(!document.fullscreenElement){
+
         document.documentElement.requestFullscreen();
+
+        document.body.classList.add("fullscreen");
+
     }else{
+
         document.exitFullscreen();
+
+        document.body.classList.remove("fullscreen");
     }
 }
 
 /* =========================
    RESET
 ========================= */
+
 function reset(){
+
     localStorage.removeItem("videos");
+
     window.location.href = "index.html";
 }
+
+/* =========================
+   START
+========================= */
 
 load();
 
