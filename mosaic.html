@@ -8,10 +8,6 @@
 
 <style>
 
-/* =========================
-   BASE IMERSIVO
-========================= */
-
 html, body {
     margin:0;
     padding:0;
@@ -25,7 +21,7 @@ html, body {
 }
 
 /* =========================
-   CANVAS 16:9 CENTRAL
+   CANVAS 16:9
 ========================= */
 
 #stage {
@@ -55,12 +51,6 @@ html, body {
     height:100%;
     background:#000;
     overflow:hidden;
-    border:2px solid transparent;
-}
-
-.tile.selected {
-    border:2px solid #ff0000;
-    box-shadow:0 0 8px red;
 }
 
 iframe {
@@ -70,7 +60,29 @@ iframe {
 }
 
 /* =========================
-   OVERLAY (AUTO HIDE)
+   TILE CONTROLS (TOUCH SAFE)
+========================= */
+
+.tileControls {
+    position:absolute;
+    bottom:5px;
+    right:5px;
+    z-index:10;
+    display:flex;
+    gap:5px;
+}
+
+.smallBtn {
+    background:#ff0000cc;
+    border:none;
+    color:white;
+    font-size:10px;
+    padding:5px 6px;
+    border-radius:4px;
+}
+
+/* =========================
+   OVERLAY GLOBAL
 ========================= */
 
 #overlay {
@@ -84,13 +96,15 @@ iframe {
 
     opacity:0;
     transition:0.2s;
+    pointer-events:none;
 }
 
 #overlay.show {
     opacity:1;
+    pointer-events:auto;
 }
 
-button {
+#overlay button {
     background:#ff0000;
     color:white;
     border:none;
@@ -99,9 +113,9 @@ button {
     font-size:12px;
 }
 
-/* fullscreen hide */
-.fullscreen #overlay {
-    opacity:0 !important;
+/* auto-hide fullscreen style */
+body.fullscreen #overlay {
+    opacity:0;
     pointer-events:none;
 }
 
@@ -112,7 +126,7 @@ button {
 #modal {
     position:fixed;
     inset:0;
-    background:rgba(0,0,0,0.85);
+    background:rgba(0,0,0,0.8);
     display:none;
     align-items:center;
     justify-content:center;
@@ -121,12 +135,12 @@ button {
 
 #modalBox {
     background:#111;
-    padding:16px;
-    border-radius:10px;
+    padding:15px;
     width:80%;
+    border-radius:10px;
 }
 
-#modal input {
+#modalBox input {
     width:100%;
     padding:10px;
     margin-bottom:10px;
@@ -137,10 +151,11 @@ button {
 
 <body>
 
-<!-- OVERLAY -->
+<!-- OVERLAY GLOBAL -->
 <div id="overlay">
-    <button onclick="swapMode()">TROCAR</button>
-    <button onclick="openReplace()">SUBSTITUIR</button>
+    <button onclick="markA()">MARCAR A</button>
+    <button onclick="markB()">MARCAR B</button>
+    <button onclick="swap()">TROCAR</button>
 </div>
 
 <!-- MODAL -->
@@ -152,18 +167,18 @@ button {
     </div>
 </div>
 
-<!-- STAGE -->
 <div id="stage"></div>
 
 <script>
 
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
-let selected = null;
-let swapFirst = null;
+let markAIndex = null;
+let markBIndex = null;
+let replaceIndex = null;
 
 /* =========================
-   EXTRAI ID
+   YOUTUBE ID
 ========================= */
 
 function extractID(url){
@@ -173,17 +188,17 @@ function extractID(url){
 }
 
 /* =========================
-   OVERLAY AUTO SHOW
+   OVERLAY CONTROL
 ========================= */
 
-let timer;
+let overlayTimer;
 
 function showOverlay(){
     let o = document.getElementById("overlay");
     o.classList.add("show");
 
-    clearTimeout(timer);
-    timer = setTimeout(()=>{
+    clearTimeout(overlayTimer);
+    overlayTimer = setTimeout(()=>{
         o.classList.remove("show");
     }, 2500);
 }
@@ -191,7 +206,7 @@ function showOverlay(){
 document.body.addEventListener("touchstart", showOverlay);
 
 /* =========================
-   LAYOUT
+   GRID LAYOUT
 ========================= */
 
 function layout(n){
@@ -226,26 +241,15 @@ function load(){
         let tile = document.createElement("div");
         tile.className = "tile";
 
-        if(selected === i) tile.classList.add("selected");
-
-        tile.onclick = ()=>{
-
-            if(swapFirst === null){
-                swapFirst = i;
-            } else {
-                swap(i);
-            }
-
-            selected = i;
-            load();
-            showOverlay();
-        };
-
         tile.innerHTML = `
             <iframe
                 src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
-                allow="autoplay; encrypted-media; fullscreen">
+                allow="autoplay; encrypted-media">
             </iframe>
+
+            <div class="tileControls">
+                <button class="smallBtn" onclick="openReplace(${i})">TROCAR LIVE</button>
+            </div>
         `;
 
         stage.appendChild(tile);
@@ -253,48 +257,57 @@ function load(){
 }
 
 /* =========================
-   SWAP SYSTEM (2 TOQUES)
+   SWAP SYSTEM (A/B)
 ========================= */
 
-function swap(second){
+function markA(){
+    markAIndex = promptIndex("Selecionar A (0 a 5)");
+}
 
-    if(swapFirst === null || swapFirst === second){
-        swapFirst = second;
-        return;
-    }
+function markB(){
+    markBIndex = promptIndex("Selecionar B (0 a 5)");
+}
 
-    let tmp = videos[swapFirst];
-    videos[swapFirst] = videos[second];
-    videos[second] = tmp;
+function swap(){
 
-    swapFirst = null;
+    if(markAIndex == null || markBIndex == null) return;
+
+    let tmp = videos[markAIndex];
+    videos[markAIndex] = videos[markBIndex];
+    videos[markBIndex] = tmp;
 
     localStorage.setItem("videos", JSON.stringify(videos));
+
+    markAIndex = null;
+    markBIndex = null;
+
     load();
 }
 
 /* =========================
-   BOTÃO TROCAR (modo explicito)
+   SIMPLE INDEX INPUT
 ========================= */
 
-function swapMode(){
+function promptIndex(msg){
 
-    if(swapFirst !== null){
-        swapFirst = null;
-    }
+    let v = prompt(msg);
+
+    let i = parseInt(v);
+
+    if(isNaN(i)) return null;
+
+    if(i < 0 || i > 5) return null;
+
+    return i;
 }
 
 /* =========================
-   SUBSTITUIR LIVE
+   REPLACE LIVE
 ========================= */
 
-let replaceIndex = null;
+function openReplace(index){
 
-function openReplace(){
-
-    if(selected === null) return;
-
-    replaceIndex = selected;
+    replaceIndex = index;
 
     document.getElementById("modal").style.display = "flex";
 }
