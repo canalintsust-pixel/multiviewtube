@@ -9,7 +9,7 @@
 <style>
 
 /* =========================
-   RESET ANDROID SAFE
+   BASE FIX (REMOVE BUG ANDROID + GREEN BAR)
 ========================= */
 
 html, body {
@@ -17,60 +17,48 @@ html, body {
     padding:0;
     width:100%;
     height:100%;
-    background:#000;
+    background:black;
     overflow:hidden;
-    font-family:Arial;
+    position:fixed;
+    inset:0;
 }
 
 /* =========================
-   CENTRAL 16:9 STAGE (CORE FIX)
+   CENTRAL CANVAS 16:9
 ========================= */
 
 #stage {
     position:absolute;
-
     top:50%;
     left:50%;
-
     transform:translate(-50%, -50%);
 
-    /* 🔥 FORÇA 16:9 REAL */
-    width:min(100vw, calc(100vh * 16 / 9));
-    height:min(100vh, calc(100vw * 9 / 16));
+    width:100vw;
+    height:calc(100vw * 9 / 16);
 
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    max-height:100vh;
+    max-width:calc(100vh * 16 / 9);
 
-    background:#000;
-}
+    background:black;
 
-/* =========================
-   GRID DENTRO DO 16:9
-========================= */
-
-#grid{
     display:grid;
-    width:100%;
-    height:100%;
-    gap:2px; /* 🔥 menor espaço vertical */
+    gap:2px; /* 🔥 quase zero espaço */
 }
 
 /* =========================
    TILE 16:9 PERFEITO
 ========================= */
 
-.tile{
+.tile {
     position:relative;
     width:100%;
     height:100%;
-    background:#111;
+    background:#000;
     overflow:hidden;
-    border-radius:6px;
 }
 
-/* iframe fill */
-iframe{
+/* iframe FIXO */
+iframe {
     position:absolute;
     width:100%;
     height:100%;
@@ -78,33 +66,34 @@ iframe{
 }
 
 /* =========================
-   OVERLAY
+   OVERLAY MINIMALISTA
 ========================= */
 
-#overlay{
+#overlay {
     position:fixed;
-    top:10px;
-    right:10px;
+    top:8px;
+    right:8px;
     z-index:9999;
-    opacity:0.25;
+    opacity:0.2;
 }
 
-#overlay:hover{
+#overlay:hover {
     opacity:1;
 }
 
-.btn{
+button {
     background:#ff0000;
-    color:white;
     border:none;
+    color:white;
     padding:8px 10px;
     border-radius:6px;
     font-size:12px;
 }
 
-/* fullscreen hide */
-.fullscreen #overlay{
+/* fullscreen limpa UI */
+.fullscreen #overlay {
     opacity:0;
+    pointer-events:none;
 }
 
 </style>
@@ -113,13 +102,10 @@ iframe{
 <body>
 
 <div id="overlay">
-    <button class="btn" onclick="toggleFS()">TELA CHEIA</button>
+    <button onclick="toggleFS()">TELA CHEIA</button>
 </div>
 
-<!-- 🔥 STAGE 16:9 FIXO -->
-<div id="stage">
-    <div id="grid"></div>
-</div>
+<div id="stage"></div>
 
 <script>
 
@@ -137,44 +123,41 @@ function extractID(url){
 }
 
 /* =========================
-   LAYOUT INTELIGENTE
+   GRID INTELIGENTE DENTRO DO CANVAS 16:9
 ========================= */
 
-function getCols(n){
-    if(n === 1) return 1;
-    if(n === 2) return 2;
-    if(n === 3) return 2;
-    if(n === 4) return 2;
-    if(n === 5) return 3;
-    return 3;
-}
+function getGrid(n){
 
-function getRows(n){
-    if(n <= 2) return 1;
-    if(n <= 4) return 2;
-    return 2;
-}
+    if(n === 1) return "1 / 1 / 2 / 2";
 
-function applyLayout(n){
+    if(n === 2) return "1 / 2 / 2 / 3";
 
-    let grid = document.getElementById("grid");
+    if(n === 3) return "repeat(2, 1fr) / repeat(2, 1fr)";
 
-    grid.style.gridTemplateColumns = `repeat(${getCols(n)}, 1fr)`;
-    grid.style.gridTemplateRows = `repeat(${getRows(n)}, 1fr)`;
+    if(n === 4) return "repeat(2, 1fr) / repeat(2, 1fr)";
+
+    if(n === 5) return "repeat(2, 1fr) / repeat(3, 1fr)";
+
+    return "repeat(2, 1fr) / repeat(3, 1fr)";
 }
 
 /* =========================
-   RENDER
+   LOAD MOSAICO
 ========================= */
 
 function load(){
 
-    let grid = document.getElementById("grid");
-    grid.innerHTML = "";
+    let stage = document.getElementById("stage");
+    stage.innerHTML = "";
 
     let n = Math.min(videos.length, 6);
 
-    applyLayout(n);
+    /* layout automático simples e estável */
+    let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
+    let rows = (n <= 2) ? 1 : 2;
+
+    stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    stage.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
     for(let i=0;i<n;i++){
 
@@ -190,41 +173,10 @@ function load(){
                 allow="autoplay; encrypted-media; fullscreen"
                 allowfullscreen>
             </iframe>
-
-            <button onclick="replace(${i})"
-                style="
-                position:absolute;
-                bottom:5px;
-                right:5px;
-                z-index:5;
-                font-size:10px;
-                padding:4px 6px;
-                background:#000000aa;
-                color:white;
-                border:1px solid #555;">
-                TROCAR
-            </button>
         `;
 
-        grid.appendChild(tile);
+        stage.appendChild(tile);
     }
-}
-
-/* =========================
-   SUBSTITUI LIVE
-========================= */
-
-function replace(index){
-
-    let url = prompt("Cole nova live:");
-
-    if(!url) return;
-
-    videos[index] = url;
-
-    localStorage.setItem("videos", JSON.stringify(videos));
-
-    load();
 }
 
 /* =========================
@@ -234,9 +186,12 @@ function replace(index){
 function toggleFS(){
 
     if(!document.fullscreenElement){
+
         document.documentElement.requestFullscreen();
         document.body.classList.add("fullscreen");
-    }else{
+
+    } else {
+
         document.exitFullscreen();
         document.body.classList.remove("fullscreen");
     }
