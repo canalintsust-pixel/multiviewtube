@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mosaic</title>
+<title>Mosaico</title>
 
 <style>
 body{
@@ -13,52 +13,54 @@ body{
     font-family:Arial;
 }
 
+/* barra superior */
 #topbar{
-    position:fixed;
-    top:0;
-    left:0;
-    right:0;
-    background:#111;
     padding:10px;
+    background:#1c1c1c;
     display:flex;
     gap:10px;
-    z-index:10;
+    align-items:center;
+    justify-content:space-between;
 }
 
 button{
-    padding:8px;
+    padding:10px;
     background:#333;
     color:white;
     border:none;
 }
 
+/* grid principal */
 #grid{
     display:grid;
-    gap:6px;
-    padding-top:60px;
+    gap:4px;
+    padding:4px;
+    height:calc(100vh - 60px);
 }
 
+/* container da live */
 .tile{
+    background:black;
     position:relative;
-    background:#222;
     overflow:hidden;
     aspect-ratio:16/9;
-    border-radius:8px;
+    border:1px solid #333;
 }
 
-.name{
-    position:absolute;
-    bottom:5px;
-    left:5px;
-    background:rgba(0,0,0,0.6);
-    padding:3px 6px;
-    font-size:12px;
-}
-
+/* iframe ocupa tudo */
 iframe{
     width:100%;
     height:100%;
-    border:none;
+    border:0;
+}
+
+/* botão trocar link */
+.swap{
+    position:absolute;
+    bottom:5px;
+    right:5px;
+    font-size:10px;
+    background:#000a;
 }
 </style>
 </head>
@@ -66,26 +68,38 @@ iframe{
 <body>
 
 <div id="topbar">
-<button onclick="toggleNames()">Ocultar Nomes</button>
-<button onclick="fullscreen()">Tela Cheia</button>
+<button onclick="fullscreen()">TELA CHEIA</button>
+<button onclick="shuffle()">TROCAR POSIÇÃO</button>
+<button onclick="reloadLives()">RELOAD</button>
 </div>
 
 <div id="grid"></div>
 
 <script>
 
-let showNames = true;
+let links = [];
 
-function getData(){
+// pega links da URL
+function load(){
 
-    let data = localStorage.getItem("mv_data");
-    return data ? JSON.parse(data) : [];
+    let params = new URLSearchParams(window.location.search);
+    let raw = params.get("data") || "";
 
+    raw = raw.replace(/\s/g,"");
+
+    links = raw.split("https://").filter(Boolean)
+               .map(x => "https://" + x)
+               .slice(0,6);
+
+    render();
 }
 
-function build(){
+function getId(url){
+    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    return m ? m[2] : null;
+}
 
-    let links = getData();
+function render(){
 
     let grid = document.getElementById("grid");
     grid.innerHTML = "";
@@ -93,43 +107,47 @@ function build(){
     let cols = 1;
     if(links.length == 2) cols = 2;
     else if(links.length <= 4) cols = 2;
-    else cols = 4;
+    else cols = 3;
 
     grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
 
-    links.forEach((item,i)=>{
+    links.forEach((url,i)=>{
 
-        let id = extract(item.url);
+        let id = getId(url);
 
         let div = document.createElement("div");
         div.className = "tile";
 
         div.innerHTML = `
-            <iframe src="https://www.youtube.com/embed/${id}"
-            allowfullscreen></iframe>
-            <div class="name">${item.name || "LIVE "+(i+1)}</div>
+            <iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1"></iframe>
+            <button class="swap" onclick="swap(${i})">swap</button>
         `;
 
         grid.appendChild(div);
     });
 }
 
-function extract(url){
-    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return m ? m[2] : "";
+function swap(i){
+
+    let j = (i+1) % links.length;
+    [links[i], links[j]] = [links[j], links[i]];
+    render();
 }
 
-function toggleNames(){
-    showNames = !showNames;
-    document.querySelectorAll(".name")
-    .forEach(n=>n.style.display = showNames ? "block" : "none");
+function shuffle(){
+    links.sort(()=>Math.random()-0.5);
+    render();
 }
 
 function fullscreen(){
     document.documentElement.requestFullscreen();
 }
 
-build();
+function reloadLives(){
+    render();
+}
+
+window.onload = load;
 
 </script>
 
