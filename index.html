@@ -15,13 +15,23 @@ body{
 
 textarea{
     width:100%;
-    height:120px;
+    height:140px;
+    font-size:14px;
+    border-radius:8px;
+    border:none;
+    padding:10px;
+    box-sizing:border-box;
 }
 
 button{
     width:100%;
     height:50px;
     margin-top:10px;
+    background:#ff0000;
+    color:white;
+    border:none;
+    border-radius:8px;
+    font-size:16px;
 }
 </style>
 </head>
@@ -31,19 +41,65 @@ button{
 <h2>MultiViewTube</h2>
 
 <textarea id="links"
-placeholder="Cole links (sem espaço também funciona)"></textarea>
+placeholder="Cole links (pode colar tudo junto, sem espaços, sem vírgulas)"></textarea>
 
 <button onclick="go()">CARREGAR MOSAICO</button>
 
 <script>
 
+/* =========================
+   EXTRATOR DE IDs
+========================= */
+function extractID(url){
+    let match = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    return match ? match[2] : null;
+}
+
+/* =========================
+   LIMPA E ORGANIZA LINKS
+========================= */
+function parseLinks(raw){
+
+    // remove espaços
+    raw = raw.replace(/\s/g,"");
+
+    // separa tudo por "https://"
+    let parts = raw.split("https://").filter(Boolean);
+
+    let links = parts.map(p => "https://" + p);
+
+    // remove inválidos
+    let cleaned = [];
+
+    for(let i=0;i<links.length;i++){
+        let id = extractID(links[i]);
+        if(id){
+            cleaned.push(links[i]);
+        }
+    }
+
+    return cleaned.slice(0,6); // limite 6 lives
+}
+
+/* =========================
+   ENVIAR PARA MOSAICO
+========================= */
 function go(){
 
     let raw = document.getElementById("links").value;
-    raw = raw.replace(/\s/g,"");
 
-    window.location.href =
-        "mosaic.html?data=" + encodeURIComponent(raw);
+    let videos = parseLinks(raw);
+
+    if(videos.length === 0){
+        alert("Nenhum link válido encontrado");
+        return;
+    }
+
+    // salva de forma segura
+    localStorage.setItem("videos", JSON.stringify(videos));
+
+    // vai para mosaico
+    window.location.href = "mosaic.html";
 }
 
 </script>
