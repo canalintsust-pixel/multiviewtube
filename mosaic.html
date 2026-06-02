@@ -88,7 +88,7 @@ button {
 }
 
 /* =========================
-   MODAL BASE
+   MODAL
 ========================= */
 
 .modal {
@@ -102,6 +102,7 @@ button {
 }
 
 .modalContent {
+    position:relative;
     background:#111;
     padding:15px;
     border-radius:10px;
@@ -109,26 +110,10 @@ button {
     max-height:80%;
     overflow:auto;
     color:white;
-    position:relative;
-}
-
-.modalHeader{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:10px;
-}
-
-.closeBtn{
-    background:#333;
-    border:none;
-    color:white;
-    padding:6px 10px;
-    border-radius:6px;
 }
 
 /* =========================
-   GRID LIST SWAP
+   LISTA SWAP
 ========================= */
 
 .gridList {
@@ -146,22 +131,35 @@ button {
     justify-content:space-between;
     align-items:center;
     transition:0.2s;
+    border:2px solid transparent;
 }
 
-.item.selected{
-    background:#ff000055;
-    border:1px solid #ff0000;
+/* highlight seleção */
+.item.selected {
+    background:#2a2a2a;
+    border:2px solid #00ff88;
+    transform:scale(1.02);
 }
 
-/* checkbox grande */
+/* checkbox maior */
 input[type="checkbox"]{
     transform:scale(1.4);
 }
 
-/* fullscreen safe */
-.fullscreen #overlay {
-    opacity:0;
-    pointer-events:none;
+/* =========================
+   CLOSE BUTTON MODAL
+========================= */
+
+.closeBtn{
+    position:absolute;
+    top:8px;
+    right:8px;
+    background:#444;
+    border:none;
+    color:white;
+    padding:5px 10px;
+    border-radius:6px;
+    font-size:12px;
 }
 
 </style>
@@ -178,17 +176,13 @@ input[type="checkbox"]{
 <!-- GRID -->
 <div id="stage"></div>
 
-<!-- =========================
-     SWAP MODAL
-========================= -->
-<div id="swapModal" class="modal" onclick="backdropClose(event,'swap')">
-    <div class="modalContent" onclick="event.stopPropagation()">
+<!-- MODAL SWAP -->
+<div id="swapModal" class="modal">
+    <div class="modalContent">
 
-        <div class="modalHeader">
-            <h3>Trocar posições</h3>
-            <button class="closeBtn" onclick="closeSwap()">X</button>
-        </div>
+        <button class="closeBtn" onclick="closeSwap()">✕</button>
 
+        <h3>Trocar posições</h3>
         <p>Selecione 2 lives</p>
 
         <div id="swapList" class="gridList"></div>
@@ -197,19 +191,17 @@ input[type="checkbox"]{
             TROCAR POSIÇÃO
         </button>
 
+        <button onclick="closeSwap()">CANCELAR</button>
     </div>
 </div>
 
-<!-- =========================
-     REPLACE MODAL
-========================= -->
-<div id="replaceModal" class="modal" onclick="backdropClose(event,'replace')">
-    <div class="modalContent" onclick="event.stopPropagation()">
+<!-- MODAL REPLACE -->
+<div id="replaceModal" class="modal">
+    <div class="modalContent">
 
-        <div class="modalHeader">
-            <h3>Substituir live</h3>
-            <button class="closeBtn" onclick="closeReplace()">X</button>
-        </div>
+        <button class="closeBtn" onclick="closeReplace()">✕</button>
+
+        <h3>Substituir live</h3>
 
         <select id="replaceSelect"></select>
 
@@ -228,7 +220,7 @@ input[type="checkbox"]{
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
 /* =========================
-   OVERLAY AUTO
+   OVERLAY AUTO SHOW
 ========================= */
 
 let timer;
@@ -246,7 +238,7 @@ function showOverlay(){
 document.body.addEventListener("touchstart", showOverlay);
 
 /* =========================
-   GRID
+   LAYOUT
 ========================= */
 
 function layout(n){
@@ -260,7 +252,7 @@ function layout(n){
 }
 
 /* =========================
-   LOAD
+   RENDER
 ========================= */
 
 function load(){
@@ -318,11 +310,12 @@ function openSwap(){
 
         let div = document.createElement("div");
         div.className = "item";
-        div.dataset.index = i;
 
         div.innerHTML = `
             Live ${i+1}
-            <input type="checkbox" onchange="toggleSwap(${i}, this)">
+            <input class="swapCheck"
+                   type="checkbox"
+                   onchange="toggleSwap(${i}, this)">
         `;
 
         list.appendChild(div);
@@ -334,7 +327,7 @@ function openSwap(){
 
 function toggleSwap(index, el){
 
-    let item = document.querySelectorAll(".item")[index];
+    let items = document.querySelectorAll(".item");
 
     if(el.checked){
 
@@ -342,20 +335,19 @@ function toggleSwap(index, el){
 
             let removed = swapSelected.shift();
 
-            let oldItem = document.querySelectorAll(".item")[removed];
-            let oldCheckbox = oldItem.querySelector("input");
+            let oldCheckbox = document.querySelectorAll(".swapCheck")[removed];
+            if(oldCheckbox) oldCheckbox.checked = false;
 
-            oldCheckbox.checked = false;
-            oldItem.classList.remove("selected");
+            items[removed].classList.remove("selected");
         }
 
         swapSelected.push(index);
-        item.classList.add("selected");
+        items[index].classList.add("selected");
 
     } else {
 
         swapSelected = swapSelected.filter(i => i !== index);
-        item.classList.remove("selected");
+        items[index].classList.remove("selected");
     }
 
     document.getElementById("swapBtn").disabled = swapSelected.length !== 2;
@@ -366,7 +358,9 @@ function confirmSwap(){
     let a = swapSelected[0];
     let b = swapSelected[1];
 
-    [videos[a], videos[b]] = [videos[b], videos[a]];
+    let tmp = videos[a];
+    videos[a] = videos[b];
+    videos[b] = tmp;
 
     localStorage.setItem("videos", JSON.stringify(videos));
 
@@ -414,15 +408,6 @@ function confirmReplace(){
 
 function closeReplace(){
     document.getElementById("replaceModal").style.display = "none";
-}
-
-/* =========================
-   BACKDROP CLOSE
-========================= */
-
-function backdropClose(e,type){
-    if(type === 'swap') closeSwap();
-    if(type === 'replace') closeReplace();
 }
 
 /* =========================
