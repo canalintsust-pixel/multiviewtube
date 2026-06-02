@@ -7,22 +7,15 @@
 
 <style>
 body{
-    margin:0;
     background:#111;
     color:white;
     font-family:Arial;
-    padding:10px;
+    padding:15px;
 }
 
 textarea{
     width:100%;
     height:120px;
-}
-
-input{
-    width:100%;
-    padding:8px;
-    margin-top:5px;
 }
 
 button{
@@ -37,9 +30,8 @@ button{
 
 <h2>MultiViewTube</h2>
 
-<textarea id="links" placeholder="cole links sem vírgula"></textarea>
-
-<input id="names" placeholder="nomes separados por vírgula">
+<textarea id="links"
+placeholder="Cole links (sem espaço também funciona)"></textarea>
 
 <button onclick="go()">CARREGAR MOSAICO</button>
 
@@ -48,21 +40,10 @@ button{
 function go(){
 
     let raw = document.getElementById("links").value;
-    let names = document.getElementById("names").value.split(",");
-
     raw = raw.replace(/\s/g,"");
-    let links = raw.split("https://").filter(Boolean);
-    links = links.map(l=>"https://"+l);
 
-    let data = links.map((u,i)=>({
-        url:u,
-        name:names[i] || ""
-    }));
-
-    localStorage.setItem("mv_data", JSON.stringify(data));
-
-    window.location.href = "mosaic.html";
-
+    window.location.href =
+        "mosaic.html?data=" + encodeURIComponent(raw);
 }
 
 </script>
