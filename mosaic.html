@@ -2,9 +2,8 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
-<title>MultiViewTube Mosaic</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Mosaic Fix</title>
 
 <style>
 
@@ -12,12 +11,12 @@ html, body {
     margin:0;
     padding:0;
     background:#000;
-    overflow:hidden;
     height:100%;
+    overflow:hidden;
     font-family:Arial;
 }
 
-/* TOPBAR */
+/* topbar */
 .topbar{
     position:fixed;
     top:0;
@@ -29,18 +28,18 @@ html, body {
     justify-content:space-between;
     align-items:center;
     padding:0 10px;
-    z-index:1000;
+    z-index:10;
 }
 
-.topbar button{
+button{
     background:#ff0000;
+    color:#fff;
     border:none;
-    color:white;
     padding:6px 10px;
     border-radius:6px;
 }
 
-/* GRID PRINCIPAL */
+/* GRID */
 #grid{
     position:absolute;
     top:45px;
@@ -50,7 +49,6 @@ html, body {
     display:grid;
     gap:4px;
     padding:4px;
-    box-sizing:border-box;
 }
 
 /* TILE 16:9 */
@@ -59,35 +57,19 @@ html, body {
     background:#111;
     border-radius:10px;
     overflow:hidden;
-    border:1px solid #222;
-    cursor:grab;
 }
 
-.tile.dragging{
-    opacity:0.5;
-}
-
-/* IFRAME */
+/* iframe */
 iframe{
-    position:absolute;
     width:100%;
     height:100%;
     border:0;
 }
 
-/* overlay erro */
-.error{
-    position:absolute;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
-    background:#111;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    color:#ff5555;
-    font-size:14px;
+/* debug */
+.debug{
+    color:white;
+    padding:20px;
 }
 
 </style>
@@ -106,172 +88,78 @@ iframe{
 
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
-let dragIndex = null;
-
 /* =========================
-   EXTRAI ID DO YOUTUBE
+   EXTRAÇÃO MAIS FORTE
 ========================= */
 function extractID(url){
-    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return m ? m[2] : null;
+
+    if(!url) return null;
+
+    let match = url.match(
+        /(youtu\.be\/|v=|\/live\/)([a-zA-Z0-9_-]+)/
+    );
+
+    return match ? match[2] : null;
 }
 
 /* =========================
-   LAYOUT INTELIGENTE 1–6
+   LAYOUT SIMPLES E SEGURO
 ========================= */
-function getLayout(n){
+function getCols(n){
 
-    // 1 → 1x1
-    if(n <= 1){
-        return { cols:1 };
-    }
-
-    // 2 → 2x1
-    if(n == 2){
-        return { cols:2 };
-    }
-
-    // 3 → 4 colunas / 2 linhas (layout especial)
-    if(n == 3){
-        return { cols:3 };
-    }
-
-    // 4 → 2x2
-    if(n == 4){
-        return { cols:2 };
-    }
-
-    // 5 → 3 colunas (2 em cima, 3 embaixo centrado)
-    if(n == 5){
-        return { cols:3 };
-    }
-
-    // 6 → 3x2
-    return { cols:3 };
-}
-
-/* =========================
-   APLICA GRID
-========================= */
-function applyLayout(n){
-
-    let grid = document.getElementById("grid");
-
-    let layout = getLayout(n);
-
-    grid.style.gridTemplateColumns = `repeat(${layout.cols}, 1fr)`;
+    if(n <= 1) return 1;
+    if(n == 2) return 2;
+    if(n <= 4) return 2;
+    return 3;
 }
 
 /* =========================
    CRIA TILE
 ========================= */
-function createTile(url, index){
+function createTile(url){
 
     let id = extractID(url);
 
     let div = document.createElement("div");
     div.className = "tile";
-    div.draggable = true;
-    div.dataset.index = index;
 
     if(!id){
-        div.innerHTML = `<div class="error">LINK INVÁLIDO</div>`;
+        div.innerHTML = "<div style='color:red;padding:10px'>LINK INVÁLIDO</div>";
         return div;
     }
 
     div.innerHTML = `
         <iframe
-            src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
+            src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0&origin=${location.origin}"
             allow="autoplay; encrypted-media; fullscreen"
             allowfullscreen>
         </iframe>
     `;
 
-    /* =========================
-       DRAG START
-    ========================= */
-    div.addEventListener("dragstart", ()=>{
-        dragIndex = index;
-        div.classList.add("dragging");
-    });
-
-    div.addEventListener("dragend", ()=>{
-        div.classList.remove("dragging");
-    });
-
-    div.addEventListener("dragover", e=>{
-        e.preventDefault();
-    });
-
-    /* =========================
-       DROP (SWAP)
-    ========================= */
-    div.addEventListener("drop", e=>{
-        e.preventDefault();
-
-        let targetIndex = index;
-
-        let temp = videos[dragIndex];
-        videos[dragIndex] = videos[targetIndex];
-        videos[targetIndex] = temp;
-
-        localStorage.setItem("videos", JSON.stringify(videos));
-        load();
-    });
-
     return div;
 }
 
 /* =========================
-   CARREGA MOSAICO
+   LOAD PRINCIPAL
 ========================= */
 function load(){
 
     let grid = document.getElementById("grid");
     grid.innerHTML = "";
 
-    let n = Math.min(videos.length, 6);
-
-    applyLayout(n);
-
-    for(let i=0;i<n;i++){
-        grid.appendChild(createTile(videos[i], i));
+    // 🔴 DEBUG VISUAL
+    if(!videos || videos.length === 0){
+        grid.innerHTML = "<div class='debug'>Nenhum vídeo carregado.<br>Volte ao index.html e cole links.</div>";
+        return;
     }
 
-    setTimeout(checkVideos, 6000);
-}
+    let n = Math.min(videos.length, 6);
 
-/* =========================
-   DETECÇÃO SIMPLES DE ERRO
-========================= */
-function checkVideos(){
+    grid.style.gridTemplateColumns =
+        `repeat(${getCols(n)}, 1fr)`;
 
-    let frames = document.querySelectorAll("iframe");
-
-    frames.forEach((f, i)=>{
-
-        try{
-            if(!f.contentWindow){
-                markError(i);
-            }
-        }catch(e){
-            markError(i);
-        }
-
-    });
-}
-
-/* =========================
-   MARCA ERRO E PEDE TROCA
-========================= */
-function markError(index){
-
-    let newUrl = prompt("Live caiu. Cole nova URL:");
-
-    if(newUrl){
-        videos[index] = newUrl;
-        localStorage.setItem("videos", JSON.stringify(videos));
-        load();
+    for(let i=0;i<n;i++){
+        grid.appendChild(createTile(videos[i]));
     }
 }
 
@@ -295,7 +183,6 @@ function reset(){
     window.location.href = "index.html";
 }
 
-/* START */
 load();
 
 </script>
