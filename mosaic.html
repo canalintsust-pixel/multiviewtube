@@ -21,7 +21,7 @@ html, body {
 }
 
 /* =========================
-   GRID 16:9 CENTRAL
+   STAGE 16:9 SAFE CANVAS
 ========================= */
 
 #stage {
@@ -41,12 +41,17 @@ html, body {
     background:black;
 }
 
+/* =========================
+   TILE 16:9 FIX
+========================= */
+
 .tile {
     position:relative;
     width:100%;
     height:100%;
     background:#000;
     overflow:hidden;
+    aspect-ratio:16/9;
 }
 
 iframe {
@@ -112,15 +117,10 @@ button {
     color:white;
 }
 
-/* =========================
-   LISTA SWAP
-========================= */
-
 .gridList {
     display:grid;
     grid-template-columns:repeat(2, 1fr);
     gap:8px;
-    margin-top:10px;
 }
 
 .item {
@@ -134,21 +134,14 @@ button {
     border:2px solid transparent;
 }
 
-/* highlight seleção */
 .item.selected {
-    background:#2a2a2a;
     border:2px solid #00ff88;
-    transform:scale(1.02);
+    background:#2a2a2a;
 }
 
-/* checkbox maior */
 input[type="checkbox"]{
     transform:scale(1.4);
 }
-
-/* =========================
-   CLOSE BUTTON MODAL
-========================= */
 
 .closeBtn{
     position:absolute;
@@ -171,15 +164,15 @@ input[type="checkbox"]{
 <div id="overlay">
     <button onclick="openSwap()">TROCAR</button>
     <button onclick="openReplace()">SUBSTITUIR</button>
+    <button onclick="cycleLayout()">LAYOUT</button>
 </div>
 
-<!-- GRID -->
+<!-- STAGE -->
 <div id="stage"></div>
 
-<!-- MODAL SWAP -->
+<!-- SWAP MODAL -->
 <div id="swapModal" class="modal">
     <div class="modalContent">
-
         <button class="closeBtn" onclick="closeSwap()">✕</button>
 
         <h3>Trocar posições</h3>
@@ -195,10 +188,9 @@ input[type="checkbox"]{
     </div>
 </div>
 
-<!-- MODAL REPLACE -->
+<!-- REPLACE MODAL -->
 <div id="replaceModal" class="modal">
     <div class="modalContent">
-
         <button class="closeBtn" onclick="closeReplace()">✕</button>
 
         <h3>Substituir live</h3>
@@ -211,16 +203,23 @@ input[type="checkbox"]{
 
         <button onclick="confirmReplace()">OK</button>
         <button onclick="closeReplace()">CANCELAR</button>
-
     </div>
 </div>
 
 <script>
 
+/* =========================
+   STATE
+========================= */
+
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
+let layoutMode = 0;
+let mainIndex = 0;
+let swapSelected = [];
+
 /* =========================
-   OVERLAY AUTO SHOW
+   OVERLAY AUTO HIDE
 ========================= */
 
 let timer;
@@ -238,21 +237,73 @@ function showOverlay(){
 document.body.addEventListener("touchstart", showOverlay);
 
 /* =========================
-   LAYOUT
+   YOUTUBE ID
 ========================= */
 
-function layout(n){
-    let stage = document.getElementById("stage");
-
-    let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
-    let rows = (n <= 2) ? 1 : 2;
-
-    stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    stage.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+function extractID(url){
+    if(!url) return null;
+    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    return m ? m[2] : null;
 }
 
 /* =========================
-   RENDER
+   LAYOUT ENGINE
+========================= */
+
+function cycleLayout(){
+    layoutMode = (layoutMode + 1) % 4;
+    load();
+}
+
+/* =========================
+   AUTO ROTATE
+========================= */
+
+setInterval(()=>{
+    if(layoutMode === 3 && videos.length > 1){
+        mainIndex = (mainIndex + 1) % videos.length;
+        load();
+    }
+}, 180000);
+
+/* =========================
+   APPLY LAYOUT
+========================= */
+
+function applyLayout(n){
+
+    let stage = document.getElementById("stage");
+
+    if(layoutMode === 0){
+
+        let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
+        let rows = (n <= 2) ? 1 : 2;
+
+        stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        stage.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+        return;
+    }
+
+    if(layoutMode === 1){
+        stage.style.gridTemplateColumns = "2fr 1fr";
+        stage.style.gridTemplateRows = "repeat(3, 1fr)";
+        return;
+    }
+
+    if(layoutMode === 2){
+        stage.style.gridTemplateColumns = "repeat(3, 1fr)";
+        stage.style.gridTemplateRows = "2fr 1fr";
+        return;
+    }
+
+    if(layoutMode === 3){
+        stage.style.gridTemplateColumns = "2fr 1fr";
+        stage.style.gridTemplateRows = "repeat(3, 1fr)";
+    }
+}
+
+/* =========================
+   LOAD
 ========================= */
 
 function load(){
@@ -261,7 +312,8 @@ function load(){
     stage.innerHTML = "";
 
     let n = Math.min(videos.length, 6);
-    layout(n);
+
+    applyLayout(n);
 
     for(let i=0;i<n;i++){
 
@@ -270,6 +322,8 @@ function load(){
 
         let tile = document.createElement("div");
         tile.className = "tile";
+
+        let isMain = (layoutMode === 3 && i === mainIndex);
 
         tile.innerHTML = `
             <iframe
@@ -283,20 +337,8 @@ function load(){
 }
 
 /* =========================
-   YOUTUBE ID
+   SWAP
 ========================= */
-
-function extractID(url){
-    if(!url) return null;
-    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return m ? m[2] : null;
-}
-
-/* =========================
-   SWAP SYSTEM
-========================= */
-
-let swapSelected = [];
 
 function openSwap(){
 
@@ -313,9 +355,7 @@ function openSwap(){
 
         div.innerHTML = `
             Live ${i+1}
-            <input class="swapCheck"
-                   type="checkbox"
-                   onchange="toggleSwap(${i}, this)">
+            <input type="checkbox" onchange="toggleSwap(${i}, this)">
         `;
 
         list.appendChild(div);
@@ -332,12 +372,8 @@ function toggleSwap(index, el){
     if(el.checked){
 
         if(swapSelected.length === 2){
-
             let removed = swapSelected.shift();
-
-            let oldCheckbox = document.querySelectorAll(".swapCheck")[removed];
-            if(oldCheckbox) oldCheckbox.checked = false;
-
+            document.querySelectorAll("input")[removed].checked = false;
             items[removed].classList.remove("selected");
         }
 
@@ -345,7 +381,6 @@ function toggleSwap(index, el){
         items[index].classList.add("selected");
 
     } else {
-
         swapSelected = swapSelected.filter(i => i !== index);
         items[index].classList.remove("selected");
     }
@@ -373,7 +408,7 @@ function closeSwap(){
 }
 
 /* =========================
-   REPLACE SYSTEM
+   REPLACE
 ========================= */
 
 function openReplace(){
@@ -411,7 +446,7 @@ function closeReplace(){
 }
 
 /* =========================
-   START
+   INIT
 ========================= */
 
 load();
