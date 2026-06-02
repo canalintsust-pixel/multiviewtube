@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-
 <title>MultiViewTube</title>
 
 <style>
@@ -12,28 +11,28 @@ body{
     background:#0f0f0f;
     color:white;
     font-family:Arial;
+    overflow:hidden;
 }
 
-#top{
+/* TELA CONFIG */
+#config{
     padding:10px;
-    background:#1a1a1a;
-    position:sticky;
-    top:0;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
 }
 
 textarea{
-    width:100%;
-    height:90px;
-    border-radius:8px;
+    flex:1;
+    resize:none;
+    border-radius:10px;
     border:none;
-    padding:8px;
-    font-size:14px;
+    padding:10px;
 }
 
 button{
-    width:100%;
     height:45px;
-    margin-top:6px;
+    margin-top:8px;
     border:none;
     border-radius:8px;
     background:#ff0000;
@@ -41,20 +40,36 @@ button{
     font-weight:bold;
 }
 
+/* TELA MOSAICO */
+#app{
+    display:none;
+    height:100vh;
+    position:relative;
+}
+
 #grid{
     display:grid;
-    gap:6px;
-    padding:6px;
+    gap:5px;
+    width:100%;
+    height:100%;
+    padding:5px;
 }
 
+/* CARD */
 .card{
     position:relative;
-    background:#000;
-    border-radius:10px;
-    overflow:hidden;
+    background:black;
     aspect-ratio:16/9;
+    overflow:hidden;
 }
 
+.card iframe{
+    width:100%;
+    height:100%;
+    border:none;
+}
+
+/* NOMES */
 .name{
     position:absolute;
     top:5px;
@@ -62,65 +77,83 @@ button{
     background:rgba(0,0,0,0.6);
     padding:3px 6px;
     font-size:12px;
-    z-index:2;
 }
 
-.controls{
+/* CONTROLES GLOBAIS */
+#controls{
     position:absolute;
-    bottom:5px;
-    right:5px;
+    top:10px;
+    right:10px;
+    z-index:10;
     display:flex;
     gap:5px;
-    z-index:2;
 }
 
-.controls button{
-    width:auto;
-    height:28px;
-    font-size:11px;
-    padding:2px 6px;
-    background:#333;
-    border-radius:5px;
-}
-
-iframe{
-    width:100%;
-    height:100%;
+.ctrl-btn{
+    background:#222;
     border:none;
+    color:white;
+    padding:6px 8px;
+    border-radius:6px;
+    font-size:12px;
+}
+
+/* FULLSCREEN MODE */
+.fullscreenMode #controls{
+    opacity:0;
+}
+
+.fullscreenMode.showControls #controls{
+    opacity:1;
 }
 </style>
 </head>
 
 <body>
 
-<div id="top">
+<!-- CONFIG -->
+<div id="config">
 
-<textarea id="links" placeholder="Cole links colados juntos (sem vírgula)"></textarea>
+<textarea id="links" placeholder="Cole links colados juntos"></textarea>
 
 <button onclick="carregar()">CARREGAR MOSAICO</button>
 
-<button onclick="toggleNames()">OCULTAR/NOMES FULLSCREEN</button>
+</div>
 
+<!-- MOSAICO -->
+<div id="app">
+
+<div id="controls">
+    <button class="ctrl-btn" onclick="toggleNames()">👁 Nomes</button>
+    <button class="ctrl-btn" onclick="fullscreenAll()">⛶ Full</button>
+    <button class="ctrl-btn" onclick="back()">↩</button>
 </div>
 
 <div id="grid"></div>
+
+</div>
 
 <script>
 
 let nomesVisiveis = true;
 
 function extrairID(url){
-    let match = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return match ? match[2] : null;
+    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    return m ? m[2] : null;
 }
 
+/* ENTRAR MOSAICO */
 function carregar(){
 
     let raw = document.getElementById("links").value.replace(/\s/g,"");
 
-    let links = raw.split("https://").filter(Boolean)
-                   .map(l=>"https://"+l)
-                   .slice(0,8);
+    let links = raw.split("https://")
+        .filter(Boolean)
+        .map(l=>"https://"+l)
+        .slice(0,8);
+
+    document.getElementById("config").style.display="none";
+    document.getElementById("app").style.display="block";
 
     let grid = document.getElementById("grid");
     grid.innerHTML="";
@@ -139,14 +172,8 @@ function carregar(){
         card.innerHTML = `
             <div class="name">Live ${i+1}</div>
 
-            <div class="controls">
-                <button onclick="mute(this)">🔇</button>
-                <button onclick="fullscreen(this)">⛶</button>
-            </div>
-
             <iframe
-                src="https://www.youtube.com/embed/${id}?enablejsapi=1"
-                allow="autoplay; encrypted-media"
+                src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0"
                 allowfullscreen>
             </iframe>
         `;
@@ -155,21 +182,27 @@ function carregar(){
     });
 }
 
-function mute(btn){
-    alert("Mute depende da API do YouTube (próxima etapa avançada)");
+/* VOLTAR */
+function back(){
+    document.getElementById("config").style.display="flex";
+    document.getElementById("app").style.display="none";
 }
 
-function fullscreen(btn){
+/* FULLSCREEN GERAL */
+function fullscreenAll(){
 
-    let card = btn.closest(".card");
+    let app = document.getElementById("app");
 
     if (!document.fullscreenElement) {
-        card.requestFullscreen();
+        app.requestFullscreen();
+        document.body.classList.add("fullscreenMode");
     } else {
         document.exitFullscreen();
+        document.body.classList.remove("fullscreenMode");
     }
 }
 
+/* MOSTRAR / OCULTAR NOMES */
 function toggleNames(){
 
     nomesVisiveis = !nomesVisiveis;
@@ -179,6 +212,11 @@ function toggleNames(){
             n.style.display = nomesVisiveis ? "block" : "none";
         });
 }
+
+/* MOSTRAR CONTROLES NO TOUCH (FULLSCREEN) */
+document.addEventListener("touchstart", ()=>{
+    document.body.classList.toggle("showControls");
+});
 
 </script>
 
