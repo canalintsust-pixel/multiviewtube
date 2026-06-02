@@ -1,650 +1,424 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
-<title>MultiView Mosaic</title>
-
-<style>
-
-html, body {
-    margin:0;
-    padding:0;
-    width:100%;
-    height:100%;
-    background:black;
-    overflow:hidden;
-    position:fixed;
-    inset:0;
-    font-family:Arial;
-}
-
-/* =========================
-   STAGE BASE
-========================= */
-
-#stage {
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%, -50%);
-
-    width:100vw;
-    height:calc(100vw * 9 / 16);
-
-    max-width:calc(100vh * 16 / 9);
-    max-height:100vh;
-
-    display:grid;
-    gap:2px;
-    background:black;
-}
-
-/* =========================
-   TILE
-========================= */
-
-.tile {
-    position:relative;
-    width:100%;
-    height:100%;
-    background:#000;
-    overflow:hidden;
-}
-
-iframe {
-    width:100%;
-    height:100%;
-    border:none;
-}
-
-/* =========================
-   OVERLAY INTELIGENTE
-========================= */
-
-#overlay {
-    position:fixed;
-    top:10px;
-    right:10px;
-    z-index:9999;
-
-    display:flex;
-    gap:6px;
-
-    opacity:0;
-    transition:0.2s;
-    pointer-events:none;
-}
-
-#overlay.show {
-    opacity:1;
-    pointer-events:auto;
-}
-
-button {
-    background:#ff0000;
-    color:white;
-    border:none;
-    padding:8px 10px;
-    border-radius:6px;
-    font-size:12px;
-}
-
-/* =========================
-   MODAL
-========================= */
-
-.modal {
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.85);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:10000;
-}
-
-.modalContent {
-    background:#111;
-    padding:15px;
-    border-radius:10px;
-    width:85%;
-    max-height:80%;
-    overflow:auto;
-    color:white;
-}
-
-/* =========================
-   LISTA SWAP
-========================= */
-
-.gridList {
-    display:grid;
-    grid-template-columns:repeat(2, 1fr);
-    gap:8px;
-    margin-top:10px;
-}
-
-.item {
-    background:#222;
-    padding:10px;
-    border-radius:6px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    transition:0.2s;
-    border:2px solid transparent;
-}
-
-.item.selected {
-    background:#2a2a2a;
-    border:2px solid #00ff88;
-    transform:scale(1.02);
-}
-
-input[type="checkbox"]{
-    transform:scale(1.4);
-}
-
-/* close modal */
-.closeBtn{
-    position:absolute;
-    top:8px;
-    right:8px;
-    background:#444;
-    border:none;
-    color:white;
-    padding:5px 10px;
-    border-radius:6px;
-    font-size:12px;
-}
-
-</style>
-</head>
-
-<body>
-
-<!-- OVERLAY -->
-<div id="overlay">
-    <button onclick="openSwap()">TROCAR</button>
-    <button onclick="openReplace()">SUBSTITUIR</button>
-    <button onclick="cycleLayout()">LAYOUT</button>
-</div>
-
-<!-- GRID -->
-<div id="stage"></div>
-<script>
-
-/* =========================
-   DADOS
-========================= */
-
-let videos = JSON.parse(localStorage.getItem("videos") || "[]");
-
-/* =========================
-   ESTADO GLOBAL
-========================= */
-
-let layoutMode = parseInt(localStorage.getItem("layoutMode") || "0");
-// 0 = grid padrão
-// 1 = destaque + coluna direita
-// 2 = 2 grandes + inferiores
-// 3 = slideshow
-
-let slideshowIndex = 0;
-let slideshowTimer = null;
-
-/* =========================
-   OVERLAY AUTO SHOW
-========================= */
-
-let timer;
-
-function showOverlay(){
-    let o = document.getElementById("overlay");
-    o.classList.add("show");
-
-    clearTimeout(timer);
-    timer = setTimeout(()=>{
-        o.classList.remove("show");
-    }, 2500);
-}
-
-document.body.addEventListener("touchstart", showOverlay);
-
-/* =========================
-   UTIL
-========================= */
-
-function extractID(url){
-    if(!url) return null;
-    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return m ? m[2] : null;
-}
-
-/* =========================
-   LAYOUT SWITCH
-========================= */
-
-function cycleLayout(){
-    layoutMode = (layoutMode + 1) % 4;
-    localStorage.setItem("layoutMode", layoutMode);
-
-    stopSlideshow();
-    load();
-}
-
-/* =========================
-   ENGINE PRINCIPAL
-========================= */
-
-function load(){
-    let stage = document.getElementById("stage");
-    stage.innerHTML = "";
-
-    let n = Math.min(videos.length, 6);
-
-    if(layoutMode === 0) return renderGrid(stage, n);
-    if(layoutMode === 1) return renderFocusRight(stage, n);
-    if(layoutMode === 2) return renderTwoBigBottom(stage, n);
-    if(layoutMode === 3) return renderSlideshow(stage, n);
-}
-
-/* =========================
-   LAYOUT 0 — GRID PADRÃO
-========================= */
-
-function renderGrid(stage, n){
-
-    let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
-    let rows = (n <= 2) ? 1 : 2;
-
-    stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    stage.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-
-    videos.slice(0,n).forEach(url=>{
-        stage.appendChild(createTile(url));
-    });
-}
-
-/* =========================
-   LAYOUT 1 — 1 GRANDE + COLUNA DIREITA
-========================= */
-
-function renderFocusRight(stage, n){
-
-    stage.style.gridTemplateColumns = "2fr 1fr";
-    stage.style.gridTemplateRows = "repeat(2, 1fr)";
-
-    if(n === 0) return;
-
-    // principal
-    let main = createTile(videos[0]);
-    main.style.gridRow = "1 / span 2";
-    main.style.gridColumn = "1 / 2";
-    stage.appendChild(main);
-
-    // laterais
-    for(let i=1;i<n;i++){
-        let t = createTile(videos[i]);
-        stage.appendChild(t);
-    }
-}
-
-/* =========================
-   LAYOUT 2 — 2 GRANDES + MINI EMBAIXO
-========================= */
-
-function renderTwoBigBottom(stage, n){
-
-    stage.style.gridTemplateColumns = "1fr 1fr";
-    stage.style.gridTemplateRows = "2fr 1fr";
-
-    if(n === 0) return;
-
-    // dois principais
-    for(let i=0;i<Math.min(2,n);i++){
-        let t = createTile(videos[i]);
-        stage.appendChild(t);
-    }
-
-    // inferiores
-    for(let i=2;i<n;i++){
-        let t = createTile(videos[i]);
-        stage.appendChild(t);
-    }
-}
-
-/* =========================
-   LAYOUT 3 — SLIDESHOW
-========================= */
-
-function renderSlideshow(stage, n){
-
-    stage.style.gridTemplateColumns = "1fr 1fr 1fr";
-    stage.style.gridTemplateRows = "2fr 1fr";
-
-    if(n === 0) return;
-
-    startSlideshow();
-
-    // principal
-    let main = createTile(videos[slideshowIndex % n]);
-    main.style.gridColumn = "1 / 4";
-    main.style.gridRow = "1 / 2";
-    stage.appendChild(main);
-
-    // mini previews
-    for(let i=0;i<n;i++){
-        let t = createTile(videos[i]);
-        stage.appendChild(t);
-    }
-}
-
-/* =========================
-   SLIDESHOW ENGINE
-========================= */
-
-function startSlideshow(){
-
-    if(slideshowTimer) return;
-
-    slideshowTimer = setInterval(()=>{
-        slideshowIndex++;
-        load();
-    }, 3000);
-}
-
-function stopSlideshow(){
-    clearInterval(slideshowTimer);
-    slideshowTimer = null;
-}
-
-/* =========================
-   TILE FACTORY
-========================= */
-
-function createTile(url){
-
-    let id = extractID(url);
-    let div = document.createElement("div");
-    div.className = "tile";
-
-    if(!id){
-        div.innerHTML = "<div style='color:white'>ERRO LIVE</div>";
-        return div;
-    }
-
-    div.innerHTML = `
-        <iframe
-            src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
-            allow="autoplay; encrypted-media; fullscreen">
-        </iframe>
-    `;
-
-    return div;
-}
-
-</script>
-<script>
-
-/* =========================
-   SWAP STATE
-========================= */
-
-let swapSelected = [];
-
-/* =========================
-   OPEN SWAP
-========================= */
-
-function openSwap(){
-
-    let modal = document.getElementById("swapModal");
-    let list = document.getElementById("swapList");
-
-    list.innerHTML = "";
-    swapSelected = [];
-
-    videos.forEach((v,i)=>{
-
-        let div = document.createElement("div");
-        div.className = "item";
-
-        div.innerHTML = `
-            Live ${i+1}
-            <input class="swapCheck"
-                   type="checkbox"
-                   onchange="toggleSwap(${i}, this)">
-        `;
-
-        list.appendChild(div);
-    });
-
-    document.getElementById("swapBtn").disabled = true;
-    modal.style.display = "flex";
-    showOverlay();
-}
-
-/* =========================
-   TOGGLE SWAP (FIX VISUAL + LIMIT 2)
-========================= */
-
-function toggleSwap(index, el){
-
-    let items = document.querySelectorAll(".item");
-    let checks = document.querySelectorAll(".swapCheck");
-
-    if(el.checked){
-
-        // limita 2 seleções
-        if(swapSelected.length === 2){
-
-            let removed = swapSelected.shift();
-
-            if(checks[removed]) checks[removed].checked = false;
-            if(items[removed]) items[removed].classList.remove("selected");
-        }
-
-        swapSelected.push(index);
-        items[index].classList.add("selected");
-
-    } else {
-
-        swapSelected = swapSelected.filter(i => i !== index);
-        items[index].classList.remove("selected");
-    }
-
-    document.getElementById("swapBtn").disabled = swapSelected.length !== 2;
-}
-
-/* =========================
-   CONFIRM SWAP
-========================= */
-
-function confirmSwap(){
-
-    if(swapSelected.length !== 2) return;
-
-    let a = swapSelected[0];
-    let b = swapSelected[1];
-
-    let tmp = videos[a];
-    videos[a] = videos[b];
-    videos[b] = tmp;
-
-    localStorage.setItem("videos", JSON.stringify(videos));
-
-    closeSwap();
-    load();
-}
-
-/* =========================
-   CLOSE SWAP (SAFE)
-========================= */
-
-function closeSwap(){
-    document.getElementById("swapModal").style.display = "none";
-}
-
-/* =========================
-   REPLACE SYSTEM (INDIVIDUAL TILE)
-========================= */
-
-let replaceIndex = null;
-
-function openReplace(){
-
-    let modal = document.getElementById("replaceModal");
-    let sel = document.getElementById("replaceSelect");
-
-    sel.innerHTML = "";
-
-    videos.forEach((v,i)=>{
-        let opt = document.createElement("option");
-        opt.value = i;
-        opt.innerText = `Live ${i+1}`;
-        sel.appendChild(opt);
-    });
-
-    modal.style.display = "flex";
-    showOverlay();
-}
-
-function confirmReplace(){
-
-    let i = document.getElementById("replaceSelect").value;
-    let url = document.getElementById("replaceInput").value;
-
-    if(!url) return;
-
-    videos[i] = url;
-
-    localStorage.setItem("videos", JSON.stringify(videos));
-
-    closeReplace();
-    load();
-}
-
-/* =========================
-   CLOSE REPLACE (SAFE)
-========================= */
-
-function closeReplace(){
-
-    document.getElementById("replaceModal").style.display = "none";
-
-    // limpa input para evitar “ficar preso”
-    document.getElementById("replaceInput").value = "";
-}
-
-/* =========================
-   BACKDROP CLOSE (TOUCH SAFE)
-========================= */
-
-document.addEventListener("touchstart", function(e){
-
-    let swap = document.getElementById("swapModal");
-    let rep = document.getElementById("replaceModal");
-
-    if(e.target === swap) closeSwap();
-    if(e.target === rep) closeReplace();
-
-});
-
-</script>
-<script>
-
-/* =========================
-   OVERLAY INTELIGENTE (FINAL POLISH)
-========================= */
-
-let overlayTimer = null;
-
-function showOverlay(){
-
-    let o = document.getElementById("overlay");
-
-    o.classList.add("show");
-
-    clearTimeout(overlayTimer);
-
-    overlayTimer = setTimeout(()=>{
-        o.classList.remove("show");
-    }, 2200);
-}
-
-/* garante funcionamento em qualquer interação */
-document.addEventListener("touchstart", showOverlay);
-document.addEventListener("click", showOverlay);
-
-/* =========================
-   MODAL ESCAPE (ANDROID SAFE)
-========================= */
-
-document.addEventListener("keydown", function(e){
-
-    if(e.key === "Escape"){
-
-        closeSwap();
-        closeReplace();
-    }
-});
-
-/* =========================
-   RECOVERY DE ESTADO (ANDROID WEBVIEW STABILITY)
-========================= */
-
-window.addEventListener("beforeunload", function(){
-
-    localStorage.setItem("videos", JSON.stringify(videos));
-});
-
-/* =========================
-   SAFETY RELOAD FIX (WEBVIEW BACKGROUND RETURN)
-========================= */
-
-window.addEventListener("visibilitychange", function(){
-
-    if(document.visibilityState === "visible"){
-
-        // evita estado travado após fullscreen exit
-        showOverlay();
-        load();
-    }
-});
-
-/* =========================
-   TOUCH INTERACTION FIX (IFRAME + OVERLAY CONFLITO)
-========================= */
-
-let touchLock = false;
-
-document.addEventListener("touchstart", function(){
-
-    if(!touchLock){
-
-        touchLock = true;
-        setTimeout(()=> touchLock = false, 80);
-    }
-});
-
-/* =========================
-   FINAL INIT BOOT
-========================= */
-
-function initApp(){
-
-    load();
-
-    // garante overlay inicial visível por 1 ciclo
-    setTimeout(showOverlay, 500);
-
-    // evita layout quebrado ao abrir direto fullscreen
-    setTimeout(()=> window.dispatchEvent(new Event("resize")), 300);
-}
-
-initApp();
-
-</script>
+<!DOCTYPE html>            
+<html>            
+<head>            
+<meta charset="utf-8">            
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">            
+            
+<title>MultiView Mosaic</title>            
+            
+<style>            
+            
+html, body {            
+    margin:0;            
+    padding:0;            
+    width:100%;            
+    height:100%;            
+    background:black;            
+    overflow:hidden;            
+    position:fixed;            
+    inset:0;            
+    font-family:Arial;            
+}            
+            
+/* =========================            
+   GRID 16:9 CENTRAL            
+========================= */            
+            
+#stage {            
+    position:absolute;            
+    top:50%;            
+    left:50%;            
+    transform:translate(-50%, -50%);            
+            
+    width:100vw;            
+    height:calc(100vw * 9 / 16);            
+            
+    max-width:calc(100vh * 16 / 9);            
+    max-height:100vh;            
+            
+    display:grid;            
+    gap:2px;            
+    background:black;            
+}            
+            
+.tile {            
+    position:relative;            
+    width:100%;            
+    height:100%;            
+    background:#000;            
+    overflow:hidden;            
+}            
+            
+iframe {            
+    width:100%;            
+    height:100%;            
+    border:none;            
+}            
+            
+/* =========================            
+   OVERLAY INTELIGENTE            
+========================= */            
+            
+#overlay {            
+    position:fixed;            
+    top:10px;            
+    right:10px;            
+    z-index:9999;            
+            
+    display:flex;            
+    gap:6px;            
+            
+    opacity:0;            
+    transition:0.2s;            
+    pointer-events:none;            
+}            
+            
+#overlay.show {            
+    opacity:1;            
+    pointer-events:auto;            
+}            
+            
+button {            
+    background:#ff0000;            
+    color:white;            
+    border:none;            
+    padding:8px 10px;            
+    border-radius:6px;            
+    font-size:12px;            
+}            
+            
+/* =========================            
+   MODAL            
+========================= */            
+            
+.modal {            
+    position:fixed;            
+    inset:0;            
+    background:rgba(0,0,0,0.85);            
+    display:none;            
+    align-items:center;            
+    justify-content:center;            
+    z-index:10000;            
+}            
+            
+.modalContent {            
+    position:relative;            
+    background:#111;            
+    padding:15px;            
+    border-radius:10px;            
+    width:85%;            
+    max-height:80%;            
+    overflow:auto;            
+    color:white;            
+}            
+            
+/* =========================            
+   LISTA SWAP            
+========================= */            
+            
+.gridList {            
+    display:grid;            
+    grid-template-columns:repeat(2, 1fr);            
+    gap:8px;            
+    margin-top:10px;            
+}            
+            
+.item {            
+    background:#222;            
+    padding:10px;            
+    border-radius:6px;            
+    display:flex;            
+    justify-content:space-between;            
+    align-items:center;            
+    transition:0.2s;            
+    border:2px solid transparent;            
+}            
+            
+/* highlight seleção */            
+.item.selected {            
+    background:#2a2a2a;            
+    border:2px solid #00ff88;            
+    transform:scale(1.02);            
+}            
+            
+/* checkbox maior */            
+input[type="checkbox"]{            
+    transform:scale(1.4);            
+}            
+            
+/* =========================            
+   CLOSE BUTTON MODAL            
+========================= */            
+            
+.closeBtn{            
+    position:absolute;            
+    top:8px;            
+    right:8px;            
+    background:#444;            
+    border:none;            
+    color:white;            
+    padding:5px 10px;            
+    border-radius:6px;            
+    font-size:12px;            
+}            
+            
+</style>            
+</head>            
+            
+<body>            
+            
+<!-- OVERLAY -->            
+<div id="overlay">            
+    <button onclick="openSwap()">TROCAR</button>            
+    <button onclick="openReplace()">SUBSTITUIR</button>            
+</div>            
+            
+<!-- GRID -->            
+<div id="stage"></div>            
+            
+<!-- MODAL SWAP -->            
+<div id="swapModal" class="modal">            
+    <div class="modalContent">            
+            
+        <button class="closeBtn" onclick="closeSwap()">✕</button>            
+            
+        <h3>Trocar posições</h3>            
+        <p>Selecione 2 lives</p>            
+            
+        <div id="swapList" class="gridList"></div>            
+            
+        <button id="swapBtn" onclick="confirmSwap()" disabled>            
+            TROCAR POSIÇÃO            
+        </button>            
+            
+        <button onclick="closeSwap()">CANCELAR</button>            
+    </div>            
+</div>            
+            
+<!-- MODAL REPLACE -->            
+<div id="replaceModal" class="modal">            
+    <div class="modalContent">            
+            
+        <button class="closeBtn" onclick="closeReplace()">✕</button>            
+            
+        <h3>Substituir live</h3>            
+            
+        <select id="replaceSelect"></select>            
+            
+        <input id="replaceInput"            
+               placeholder="Cole nova URL"            
+               style="width:100%;padding:8px;margin-top:10px;">            
+            
+        <button onclick="confirmReplace()">OK</button>            
+        <button onclick="closeReplace()">CANCELAR</button>            
+            
+    </div>            
+</div>            
+            
+<script>            
+            
+let videos = JSON.parse(localStorage.getItem("videos") || "[]");            
+            
+/* =========================            
+   OVERLAY AUTO SHOW            
+========================= */            
+            
+let timer;            
+            
+function showOverlay(){            
+    let o = document.getElementById("overlay");            
+    o.classList.add("show");            
+            
+    clearTimeout(timer);            
+    timer = setTimeout(()=>{            
+        o.classList.remove("show");            
+    }, 2500);            
+}            
+            
+document.body.addEventListener("touchstart", showOverlay);            
+            
+/* =========================            
+   LAYOUT            
+========================= */            
+            
+function layout(n){            
+    let stage = document.getElementById("stage");            
+            
+    let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);            
+    let rows = (n <= 2) ? 1 : 2;            
+            
+    stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;            
+    stage.style.gridTemplateRows = `repeat(${rows}, 1fr)`;            
+}            
+            
+/* =========================            
+   RENDER            
+========================= */            
+            
+function load(){            
+            
+    let stage = document.getElementById("stage");            
+    stage.innerHTML = "";            
+            
+    let n = Math.min(videos.length, 6);            
+    layout(n);            
+            
+    for(let i=0;i<n;i++){            
+            
+        let id = extractID(videos[i]);            
+        if(!id) continue;            
+            
+        let tile = document.createElement("div");            
+        tile.className = "tile";            
+            
+        tile.innerHTML = `            
+            <iframe            
+                src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"            
+                allow="autoplay; encrypted-media; fullscreen">            
+            </iframe>            
+        `;            
+            
+        stage.appendChild(tile);            
+    }            
+}            
+            
+/* =========================            
+   YOUTUBE ID            
+========================= */            
+            
+function extractID(url){            
+    if(!url) return null;            
+    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);            
+    return m ? m[2] : null;            
+}            
+            
+/* =========================            
+   SWAP SYSTEM            
+========================= */            
+            
+let swapSelected = [];            
+            
+function openSwap(){            
+            
+    let modal = document.getElementById("swapModal");            
+    let list = document.getElementById("swapList");            
+            
+    list.innerHTML = "";            
+    swapSelected = [];            
+            
+    videos.forEach((v,i)=>{            
+            
+        let div = document.createElement("div");            
+        div.className = "item";            
+            
+        div.innerHTML = `            
+            Live ${i+1}            
+            <input class="swapCheck"            
+                   type="checkbox"            
+                   onchange="toggleSwap(${i}, this)">            
+        `;            
+            
+        list.appendChild(div);            
+    });            
+            
+    document.getElementById("swapBtn").disabled = true;            
+    modal.style.display = "flex";            
+}            
+            
+function toggleSwap(index, el){            
+            
+    let items = document.querySelectorAll(".item");            
+            
+    if(el.checked){            
+            
+        if(swapSelected.length === 2){            
+            
+            let removed = swapSelected.shift();            
+            
+            let oldCheckbox = document.querySelectorAll(".swapCheck")[removed];            
+            if(oldCheckbox) oldCheckbox.checked = false;            
+            
+            items[removed].classList.remove("selected");            
+        }            
+            
+        swapSelected.push(index);            
+        items[index].classList.add("selected");            
+            
+    } else {            
+            
+        swapSelected = swapSelected.filter(i => i !== index);            
+        items[index].classList.remove("selected");            
+    }            
+            
+    document.getElementById("swapBtn").disabled = swapSelected.length !== 2;            
+}            
+            
+function confirmSwap(){            
+            
+    let a = swapSelected[0];            
+    let b = swapSelected[1];            
+            
+    let tmp = videos[a];            
+    videos[a] = videos[b];            
+    videos[b] = tmp;            
+            
+    localStorage.setItem("videos", JSON.stringify(videos));            
+            
+    closeSwap();            
+    load();            
+}            
+            
+function closeSwap(){            
+    document.getElementById("swapModal").style.display = "none";            
+}            
+            
+/* =========================            
+   REPLACE SYSTEM            
+========================= */            
+            
+function openReplace(){            
+            
+    let sel = document.getElementById("replaceSelect");            
+    sel.innerHTML = "";            
+            
+    videos.forEach((v,i)=>{            
+        let opt = document.createElement("option");            
+        opt.value = i;            
+        opt.innerText = `Live ${i+1}`;            
+        sel.appendChild(opt);            
+    });            
+            
+    document.getElementById("replaceModal").style.display = "flex";            
+}            
+            
+function confirmReplace(){            
+            
+    let i = document.getElementById("replaceSelect").value;            
+    let url = document.getElementById("replaceInput").value;            
+            
+    if(!url) return;            
+            
+    videos[i] = url;            
+            
+    localStorage.setItem("videos", JSON.stringify(videos));            
+            
+    closeReplace();            
+    load();            
+}            
+            
+function closeReplace(){            
+    document.getElementById("replaceModal").style.display = "none";            
+}            
+            
+/* =========================            
+   START            
+========================= */            
+            
+load();            
+showOverlay();            
+            
+</script>            
+            
+</body>            
+</html>            
+            
