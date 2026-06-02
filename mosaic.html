@@ -4,9 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
-<title>MultiView Mosaic Pro</title>
+<title>MultiView Mosaic</title>
 
 <style>
+
+/* =========================
+   BASE IMERSIVO TOTAL
+========================= */
 
 html, body {
     margin:0;
@@ -21,7 +25,7 @@ html, body {
 }
 
 /* =========================
-   STAGE 16:9 CONTROLADO
+   CANVAS 16:9 CENTRAL
 ========================= */
 
 #stage {
@@ -38,7 +42,6 @@ html, body {
 
     display:grid;
     gap:2px;
-    background:black;
 }
 
 /* =========================
@@ -52,31 +55,34 @@ html, body {
     background:#000;
     overflow:hidden;
     border:1px solid #111;
+    transition:0.15s;
 }
 
-.tile.dragging {
-    opacity:0.5;
+.tile.active {
+    border:2px solid #ff0000;
+    transform:scale(1.01);
 }
 
 /* iframe */
 iframe {
+    position:absolute;
     width:100%;
     height:100%;
     border:none;
 }
 
-/* offline overlay */
-.offline {
+/* OFFLINE */
+.offline::after{
+    content:"LIVE OFFLINE";
     position:absolute;
-    inset:0;
-    background:rgba(0,0,0,0.85);
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
     color:white;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    flex-direction:column;
-    font-size:14px;
-    z-index:5;
+    background:red;
+    padding:6px 10px;
+    font-size:12px;
+    border-radius:6px;
 }
 
 /* =========================
@@ -85,22 +91,26 @@ iframe {
 
 #overlay {
     position:fixed;
-    top:10px;
-    right:10px;
+    top:0;
+    left:0;
+    width:100%;
     z-index:9999;
 
     display:flex;
-    gap:6px;
+    justify-content:space-between;
+    padding:8px;
 
     opacity:0;
-    transition:0.25s;
+    transition:0.2s;
+    pointer-events:none;
 }
 
-body.showUI #overlay {
+#overlay.show {
     opacity:1;
+    pointer-events:auto;
 }
 
-button {
+.btn {
     background:#ff0000;
     border:none;
     color:white;
@@ -109,43 +119,30 @@ button {
     font-size:12px;
 }
 
-/* =========================
-   MODAL SUBSTITUIR LIVE
-========================= */
-
+/* modal */
 #modal {
     position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.8);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:10000;
-}
-
-#modalBox {
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
     background:#111;
-    padding:15px;
+    padding:12px;
     border-radius:10px;
-    width:80%;
-    max-width:400px;
+    z-index:10000;
+    display:none;
 }
 
-#modal input {
+#modal input{
+    width:250px;
+    padding:8px;
+}
+
+#modal button{
+    margin-top:8px;
     width:100%;
-    padding:10px;
-    margin-top:10px;
-    border:none;
-    border-radius:6px;
 }
 
-#modalActions {
-    margin-top:10px;
-    display:flex;
-    justify-content:space-between;
-}
-
-/* fullscreen */
+/* fullscreen overlay auto-hide */
 .fullscreen #overlay {
     opacity:0;
     pointer-events:none;
@@ -156,33 +153,33 @@ button {
 
 <body>
 
+<!-- OVERLAY -->
 <div id="overlay">
-    <button onclick="toggleFS()">TELA CHEIA</button>
+    <button class="btn" onclick="toggleFS()">TELA CHEIA</button>
+    <div>
+        <button class="btn" onclick="openReplace()">SUBSTITUIR</button>
+        <button class="btn" onclick="swapMode()">TROCAR POSIÇÃO</button>
+    </div>
 </div>
-
-<div id="stage"></div>
 
 <!-- MODAL -->
 <div id="modal">
-    <div id="modalBox">
-        <div style="color:white;">Substituir Live</div>
-        <input id="newUrl" placeholder="Cole nova URL">
-        <div id="modalActions">
-            <button onclick="applyReplace()">OK</button>
-            <button onclick="closeModal()">Cancelar</button>
-        </div>
-    </div>
+    <input id="inputUrl" placeholder="Cole nova live">
+    <button onclick="confirmReplace()">OK</button>
 </div>
+
+<!-- GRID -->
+<div id="stage"></div>
 
 <script>
 
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
-
-let dragIndex = null;
-let selectedIndex = null;
+let selected = null;
+let swapFirst = null;
+let swapModeOn = false;
 
 /* =========================
-   EXTRAI ID
+   ID YOUTUBE
 ========================= */
 
 function extractID(url){
@@ -196,18 +193,17 @@ function extractID(url){
 ========================= */
 
 function layout(n){
-
     let stage = document.getElementById("stage");
 
-    let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
-    let rows = (n <= 2) ? 1 : 2;
+    let cols = (n<=2)?2:(n<=4?2:3);
+    let rows = (n<=2)?1:2;
 
-    stage.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    stage.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+    stage.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+    stage.style.gridTemplateRows = `repeat(${rows},1fr)`;
 }
 
 /* =========================
-   RENDER (SEM FULL RELOAD PESADO)
+   RENDER
 ========================= */
 
 function load(){
@@ -215,8 +211,7 @@ function load(){
     let stage = document.getElementById("stage");
     stage.innerHTML = "";
 
-    let n = Math.min(videos.length, 6);
-
+    let n = Math.min(videos.length,6);
     layout(n);
 
     for(let i=0;i<n;i++){
@@ -228,138 +223,49 @@ function load(){
         tile.className = "tile";
         tile.dataset.index = i;
 
-        tile.draggable = true;
+        tile.onclick = ()=>selectTile(tile,i);
 
         tile.innerHTML = `
-            <iframe
-                src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
-                allow="autoplay; encrypted-media; fullscreen">
-            </iframe>
-
-            <div class="offline" style="display:none;">
-                LIVE OFFLINE<br>
-                <button onclick="openReplace(${i})">SUBSTITUIR</button>
-            </div>
-
-            <button style="
-                position:absolute;
-                bottom:5px;
-                right:5px;
-                z-index:10;
-                font-size:10px;
-            " onclick="openReplace(${i})">
-                TROCAR
-            </button>
+            <iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"></iframe>
         `;
 
-        /* =========================
-           SELEÇÃO
-        ========================= */
-
-        tile.addEventListener("click", ()=>{
-            selectedIndex = i;
-            showUI();
-        });
-
-        /* =========================
-           DRAG
-        ========================= */
-
-        tile.addEventListener("dragstart", ()=>{
-            dragIndex = i;
-            tile.classList.add("dragging");
-        });
-
-        tile.addEventListener("dragend", ()=>{
-            tile.classList.remove("dragging");
-        });
-
-        tile.addEventListener("dragover", e=>{
-            e.preventDefault();
-        });
-
-        tile.addEventListener("drop", e=>{
-            e.preventDefault();
-
-            if(dragIndex === null) return;
-
-            let tmp = videos[dragIndex];
-            videos[dragIndex] = videos[i];
-            videos[i] = tmp;
-
-            save();
-            load();
-        });
-
         stage.appendChild(tile);
+
+        checkOffline(tile, i);
     }
-
-    setTimeout(checkOffline, 5000);
 }
 
 /* =========================
-   OFFLINE CHECK (UI)
+   SELEÇÃO
 ========================= */
 
-function checkOffline(){
+function selectTile(tile,i){
 
-    document.querySelectorAll("iframe").forEach((frame, i)=>{
+    document.querySelectorAll(".tile").forEach(t=>t.classList.remove("active"));
 
-        try{
-            if(!frame.contentWindow){
-                showOffline(i);
-            }
-        }catch(e){
-            showOffline(i);
-        }
+    tile.classList.add("active");
+    selected = i;
 
-    });
-}
-
-function showOffline(i){
-
-    let tiles = document.querySelectorAll(".tile");
-    if(!tiles[i]) return;
-
-    tiles[i].querySelector(".offline").style.display = "flex";
+    showOverlay();
 }
 
 /* =========================
-   REPLACE LIVE (MODAL)
+   OVERLAY CONTROLLER
 ========================= */
 
-let replaceIndex = null;
+let overlayTimer;
 
-function openReplace(i){
-    replaceIndex = i;
-    document.getElementById("modal").style.display = "flex";
+function showOverlay(){
+    let o = document.getElementById("overlay");
+    o.classList.add("show");
+
+    clearTimeout(overlayTimer);
+    overlayTimer = setTimeout(()=>{
+        o.classList.remove("show");
+    },2500);
 }
 
-function closeModal(){
-    document.getElementById("modal").style.display = "none";
-}
-
-function applyReplace(){
-
-    let url = document.getElementById("newUrl").value;
-
-    if(!url) return;
-
-    videos[replaceIndex] = url;
-
-    save();
-    load();
-
-    closeModal();
-}
-
-/* =========================
-   SAVE
-========================= */
-
-function save(){
-    localStorage.setItem("videos", JSON.stringify(videos));
-}
+document.body.addEventListener("click", showOverlay);
 
 /* =========================
    FULLSCREEN
@@ -368,40 +274,97 @@ function save(){
 function toggleFS(){
 
     if(!document.fullscreenElement){
-
         document.documentElement.requestFullscreen();
         document.body.classList.add("fullscreen");
-
-    } else {
-
+    }else{
         document.exitFullscreen();
         document.body.classList.remove("fullscreen");
     }
 }
 
 /* =========================
-   OVERLAY INTELIGENTE
+   SUBSTITUIR LIVE (MODAL)
 ========================= */
 
-let uiTimer = null;
+function openReplace(){
 
-function showUI(){
+    if(selected === null) return;
 
-    document.body.classList.add("showUI");
-
-    clearTimeout(uiTimer);
-
-    uiTimer = setTimeout(()=>{
-        document.body.classList.remove("showUI");
-    }, 2500);
+    document.getElementById("modal").style.display = "block";
 }
 
-/* touch global */
-document.addEventListener("touchstart", showUI);
-document.addEventListener("click", showUI);
+function confirmReplace(){
+
+    let url = document.getElementById("inputUrl").value;
+
+    if(!url || selected===null) return;
+
+    videos[selected] = url;
+
+    localStorage.setItem("videos", JSON.stringify(videos));
+
+    document.getElementById("modal").style.display = "none";
+    document.getElementById("inputUrl").value = "";
+
+    load();
+}
 
 /* =========================
-   INIT
+   TROCA DE POSIÇÃO (SWAP MODE)
+========================= */
+
+function swapMode(){
+    swapModeOn = !swapModeOn;
+    swapFirst = null;
+    alert("Swap mode: " + (swapModeOn ? "ON" : "OFF"));
+}
+
+document.addEventListener("click", function(e){
+
+    let tile = e.target.closest(".tile");
+    if(!tile || !swapModeOn) return;
+
+    let i = Number(tile.dataset.index);
+
+    if(swapFirst === null){
+        swapFirst = i;
+        tile.style.border = "2px solid yellow";
+    }else{
+
+        let tmp = videos[swapFirst];
+        videos[swapFirst] = videos[i];
+        videos[i] = tmp;
+
+        localStorage.setItem("videos", JSON.stringify(videos));
+
+        swapFirst = null;
+        load();
+    }
+});
+
+/* =========================
+   OFFLINE CHECK (BÁSICO)
+========================= */
+
+function checkOffline(tile,index){
+
+    setTimeout(()=>{
+
+        let iframe = tile.querySelector("iframe");
+
+        try{
+            if(!iframe.contentWindow){
+                tile.classList.add("offline");
+            }
+        }catch(e){
+            tile.classList.add("offline");
+        }
+
+    },8000);
+}
+
+/* =========================
+   START
 ========================= */
 
 load();
