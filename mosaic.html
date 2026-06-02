@@ -8,6 +8,10 @@
 
 <style>
 
+/* =========================
+   BASE IMERSIVO
+========================= */
+
 html, body {
     margin:0;
     padding:0;
@@ -21,7 +25,7 @@ html, body {
 }
 
 /* =========================
-   CANVAS 16:9
+   STAGE 16:9 CENTRAL
 ========================= */
 
 #stage {
@@ -41,18 +45,14 @@ html, body {
     background:black;
 }
 
-/* =========================
-   TILE
-========================= */
-
+/* TILE */
 .tile {
-    position:relative;
     width:100%;
     height:100%;
     background:#000;
-    overflow:hidden;
 }
 
+/* iframe */
 iframe {
     width:100%;
     height:100%;
@@ -60,29 +60,7 @@ iframe {
 }
 
 /* =========================
-   TILE CONTROLS (TOUCH SAFE)
-========================= */
-
-.tileControls {
-    position:absolute;
-    bottom:5px;
-    right:5px;
-    z-index:10;
-    display:flex;
-    gap:5px;
-}
-
-.smallBtn {
-    background:#ff0000cc;
-    border:none;
-    color:white;
-    font-size:10px;
-    padding:5px 6px;
-    border-radius:4px;
-}
-
-/* =========================
-   OVERLAY GLOBAL
+   OVERLAY
 ========================= */
 
 #overlay {
@@ -104,19 +82,13 @@ iframe {
     pointer-events:auto;
 }
 
-#overlay button {
+button {
     background:#ff0000;
     color:white;
     border:none;
     padding:8px 10px;
     border-radius:6px;
     font-size:12px;
-}
-
-/* auto-hide fullscreen style */
-body.fullscreen #overlay {
-    opacity:0;
-    pointer-events:none;
 }
 
 /* =========================
@@ -126,7 +98,7 @@ body.fullscreen #overlay {
 #modal {
     position:fixed;
     inset:0;
-    background:rgba(0,0,0,0.8);
+    background:rgba(0,0,0,0.85);
     display:none;
     align-items:center;
     justify-content:center;
@@ -136,14 +108,28 @@ body.fullscreen #overlay {
 #modalBox {
     background:#111;
     padding:15px;
-    width:80%;
     border-radius:10px;
+    width:85%;
+    max-width:320px;
+    color:white;
 }
 
-#modalBox input {
+.list button {
     width:100%;
-    padding:10px;
-    margin-bottom:10px;
+    margin:3px 0;
+    padding:8px;
+    background:#222;
+    border:1px solid #333;
+}
+
+.list button.active {
+    background:#ff0000;
+}
+
+input {
+    width:100%;
+    padding:8px;
+    margin-top:10px;
 }
 
 </style>
@@ -151,31 +137,23 @@ body.fullscreen #overlay {
 
 <body>
 
-<!-- OVERLAY GLOBAL -->
+<!-- OVERLAY -->
 <div id="overlay">
-    <button onclick="markA()">MARCAR A</button>
-    <button onclick="markB()">MARCAR B</button>
-    <button onclick="swap()">TROCAR</button>
+    <button onclick="openSwap()">TROCAR</button>
+    <button onclick="openReplace()">SUBSTITUIR</button>
 </div>
 
 <!-- MODAL -->
 <div id="modal">
-    <div id="modalBox">
-        <input id="urlInput" placeholder="Cole nova live">
-        <button onclick="confirmReplace()">OK</button>
-        <button onclick="closeModal()">Cancelar</button>
-    </div>
+    <div id="modalBox"></div>
 </div>
 
+<!-- GRID -->
 <div id="stage"></div>
 
 <script>
 
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
-
-let markAIndex = null;
-let markBIndex = null;
-let replaceIndex = null;
 
 /* =========================
    YOUTUBE ID
@@ -188,17 +166,17 @@ function extractID(url){
 }
 
 /* =========================
-   OVERLAY CONTROL
+   OVERLAY AUTO HIDE
 ========================= */
 
-let overlayTimer;
+let timer;
 
 function showOverlay(){
     let o = document.getElementById("overlay");
     o.classList.add("show");
 
-    clearTimeout(overlayTimer);
-    overlayTimer = setTimeout(()=>{
+    clearTimeout(timer);
+    timer = setTimeout(()=>{
         o.classList.remove("show");
     }, 2500);
 }
@@ -206,7 +184,7 @@ function showOverlay(){
 document.body.addEventListener("touchstart", showOverlay);
 
 /* =========================
-   GRID LAYOUT
+   GRID
 ========================= */
 
 function layout(n){
@@ -244,12 +222,8 @@ function load(){
         tile.innerHTML = `
             <iframe
                 src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
-                allow="autoplay; encrypted-media">
+                allow="autoplay; encrypted-media; fullscreen">
             </iframe>
-
-            <div class="tileControls">
-                <button class="smallBtn" onclick="openReplace(${i})">TROCAR LIVE</button>
-            </div>
         `;
 
         stage.appendChild(tile);
@@ -257,77 +231,101 @@ function load(){
 }
 
 /* =========================
-   SWAP SYSTEM (A/B)
+   SWAP (A/B)
 ========================= */
 
-function markA(){
-    markAIndex = promptIndex("Selecionar A (0 a 5)");
+let swapA = null;
+let swapB = null;
+
+function openSwap(){
+
+    let modal = document.getElementById("modal");
+    let box = document.getElementById("modalBox");
+
+    swapA = null;
+    swapB = null;
+
+    box.innerHTML = `<h3>Trocar posição</h3>`;
+
+    let list = `<div class="list">`;
+
+    videos.forEach((v,i)=>{
+        list += `<button onclick="selectSwap(${i})">Live ${i+1}</button>`;
+    });
+
+    list += `</div>
+    <button onclick="confirmSwap()">OK TROCAR</button>`;
+
+    box.innerHTML += list;
+
+    modal.style.display = "flex";
 }
 
-function markB(){
-    markBIndex = promptIndex("Selecionar B (0 a 5)");
+function selectSwap(i){
+
+    if(swapA === null){
+        swapA = i;
+    } else {
+        swapB = i;
+    }
 }
 
-function swap(){
+function confirmSwap(){
 
-    if(markAIndex == null || markBIndex == null) return;
+    if(swapA === null || swapB === null) return;
 
-    let tmp = videos[markAIndex];
-    videos[markAIndex] = videos[markBIndex];
-    videos[markBIndex] = tmp;
-
-    localStorage.setItem("videos", JSON.stringify(videos));
-
-    markAIndex = null;
-    markBIndex = null;
-
-    load();
-}
-
-/* =========================
-   SIMPLE INDEX INPUT
-========================= */
-
-function promptIndex(msg){
-
-    let v = prompt(msg);
-
-    let i = parseInt(v);
-
-    if(isNaN(i)) return null;
-
-    if(i < 0 || i > 5) return null;
-
-    return i;
-}
-
-/* =========================
-   REPLACE LIVE
-========================= */
-
-function openReplace(index){
-
-    replaceIndex = index;
-
-    document.getElementById("modal").style.display = "flex";
-}
-
-function closeModal(){
-    document.getElementById("modal").style.display = "none";
-}
-
-function confirmReplace(){
-
-    let url = document.getElementById("urlInput").value;
-
-    if(!url) return;
-
-    videos[replaceIndex] = url;
+    let tmp = videos[swapA];
+    videos[swapA] = videos[swapB];
+    videos[swapB] = tmp;
 
     localStorage.setItem("videos", JSON.stringify(videos));
 
     closeModal();
     load();
+}
+
+/* =========================
+   REPLACE
+========================= */
+
+let replaceIndex = null;
+
+function openReplace(){
+
+    let modal = document.getElementById("modal");
+    let box = document.getElementById("modalBox");
+
+    box.innerHTML = `<h3>Substituir live</h3>`;
+
+    videos.forEach((v,i)=>{
+        box.innerHTML += `<button onclick="pickReplace(${i})">Live ${i+1}</button>`;
+    });
+
+    modal.style.display = "flex";
+}
+
+function pickReplace(i){
+
+    replaceIndex = i;
+
+    let url = prompt("Cole nova live:");
+
+    if(!url) return;
+
+    videos[i] = url;
+
+    localStorage.setItem("videos", JSON.stringify(videos));
+
+    closeModal();
+    load();
+}
+
+/* =========================
+   MODAL
+========================= */
+
+function closeModal(){
+    document.getElementById("modal").style.display = "none";
 }
 
 /* =========================
