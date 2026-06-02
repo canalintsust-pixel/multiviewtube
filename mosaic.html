@@ -9,7 +9,7 @@
 <style>
 
 /* =========================
-   BASE IMERSIVO TOTAL
+   BASE IMERSIVO
 ========================= */
 
 html, body {
@@ -59,32 +59,14 @@ html, body {
 }
 
 .tile.selected {
-    border:2px solid red;
-    box-shadow:0 0 10px red;
+    border:2px solid #ff0000;
+    box-shadow:0 0 8px red;
 }
 
-/* iframe */
 iframe {
     width:100%;
     height:100%;
     border:none;
-}
-
-/* OFFLINE */
-.offline {
-    position:absolute;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
-    background:rgba(120,0,0,0.7);
-    color:white;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    flex-direction:column;
-    font-size:14px;
-    z-index:5;
 }
 
 /* =========================
@@ -102,12 +84,10 @@ iframe {
 
     opacity:0;
     transition:0.2s;
-    pointer-events:none;
 }
 
 #overlay.show {
     opacity:1;
-    pointer-events:auto;
 }
 
 button {
@@ -119,9 +99,9 @@ button {
     font-size:12px;
 }
 
-/* fullscreen hides overlay */
+/* fullscreen hide */
 .fullscreen #overlay {
-    opacity:0;
+    opacity:0 !important;
     pointer-events:none;
 }
 
@@ -131,20 +111,17 @@ button {
 
 #modal {
     position:fixed;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
-    background:rgba(0,0,0,0.8);
+    inset:0;
+    background:rgba(0,0,0,0.85);
     display:none;
     align-items:center;
     justify-content:center;
     z-index:10000;
 }
 
-#modalContent {
+#modalBox {
     background:#111;
-    padding:15px;
+    padding:16px;
     border-radius:10px;
     width:80%;
 }
@@ -162,17 +139,16 @@ button {
 
 <!-- OVERLAY -->
 <div id="overlay">
-    <button onclick="toggleFS()">TELA CHEIA</button>
-    <button onclick="swapAction()">TROCAR</button>
+    <button onclick="swapMode()">TROCAR</button>
     <button onclick="openReplace()">SUBSTITUIR</button>
 </div>
 
 <!-- MODAL -->
 <div id="modal">
-    <div id="modalContent">
+    <div id="modalBox">
         <input id="urlInput" placeholder="Cole nova live">
         <button onclick="confirmReplace()">OK</button>
-        <button onclick="closeModal()">CANCELAR</button>
+        <button onclick="closeModal()">Cancelar</button>
     </div>
 </div>
 
@@ -184,10 +160,10 @@ button {
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
 let selected = null;
-let swapBuffer = null;
+let swapFirst = null;
 
 /* =========================
-   YOUTUBE ID
+   EXTRAI ID
 ========================= */
 
 function extractID(url){
@@ -197,17 +173,17 @@ function extractID(url){
 }
 
 /* =========================
-   OVERLAY CONTROL
+   OVERLAY AUTO SHOW
 ========================= */
 
-let overlayTimer;
+let timer;
 
 function showOverlay(){
     let o = document.getElementById("overlay");
     o.classList.add("show");
 
-    clearTimeout(overlayTimer);
-    overlayTimer = setTimeout(()=>{
+    clearTimeout(timer);
+    timer = setTimeout(()=>{
         o.classList.remove("show");
     }, 2500);
 }
@@ -215,10 +191,11 @@ function showOverlay(){
 document.body.addEventListener("touchstart", showOverlay);
 
 /* =========================
-   GRID LAYOUT
+   LAYOUT
 ========================= */
 
 function layout(n){
+
     let stage = document.getElementById("stage");
 
     let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
@@ -238,6 +215,7 @@ function load(){
     stage.innerHTML = "";
 
     let n = Math.min(videos.length, 6);
+
     layout(n);
 
     for(let i=0;i<n;i++){
@@ -247,11 +225,17 @@ function load(){
 
         let tile = document.createElement("div");
         tile.className = "tile";
-        tile.dataset.index = i;
 
         if(selected === i) tile.classList.add("selected");
 
         tile.onclick = ()=>{
+
+            if(swapFirst === null){
+                swapFirst = i;
+            } else {
+                swap(i);
+            }
+
             selected = i;
             load();
             showOverlay();
@@ -265,80 +249,52 @@ function load(){
         `;
 
         stage.appendChild(tile);
-
-        checkLive(tile, i);
     }
 }
 
 /* =========================
-   OFFLINE CHECK SIMPLES
+   SWAP SYSTEM (2 TOQUES)
 ========================= */
 
-function checkLive(tile, index){
+function swap(second){
 
-    setTimeout(()=>{
-
-        let iframe = tile.querySelector("iframe");
-
-        try {
-            if(!iframe.contentWindow){
-                showOffline(tile, index);
-            }
-        } catch(e){
-            showOffline(tile, index);
-        }
-
-    }, 8000);
-}
-
-function showOffline(tile, index){
-
-    let div = document.createElement("div");
-    div.className = "offline";
-    div.innerHTML = `
-        LIVE OFFLINE<br>
-        <button onclick="openReplace(${index})">SUBSTITUIR</button>
-    `;
-
-    tile.appendChild(div);
-}
-
-/* =========================
-   SWAP
-========================= */
-
-function swapAction(){
-
-    if(selected === null) return;
-
-    if(swapBuffer === null){
-        swapBuffer = selected;
+    if(swapFirst === null || swapFirst === second){
+        swapFirst = second;
         return;
     }
 
-    let a = swapBuffer;
-    let b = selected;
+    let tmp = videos[swapFirst];
+    videos[swapFirst] = videos[second];
+    videos[second] = tmp;
 
-    let tmp = videos[a];
-    videos[a] = videos[b];
-    videos[b] = tmp;
-
-    swapBuffer = null;
-    selected = null;
+    swapFirst = null;
 
     localStorage.setItem("videos", JSON.stringify(videos));
     load();
 }
 
 /* =========================
-   MODAL REPLACE
+   BOTÃO TROCAR (modo explicito)
+========================= */
+
+function swapMode(){
+
+    if(swapFirst !== null){
+        swapFirst = null;
+    }
+}
+
+/* =========================
+   SUBSTITUIR LIVE
 ========================= */
 
 let replaceIndex = null;
 
-function openReplace(index){
+function openReplace(){
 
-    replaceIndex = index ?? selected;
+    if(selected === null) return;
+
+    replaceIndex = selected;
 
     document.getElementById("modal").style.display = "flex";
 }
@@ -359,21 +315,6 @@ function confirmReplace(){
 
     closeModal();
     load();
-}
-
-/* =========================
-   FULLSCREEN
-========================= */
-
-function toggleFS(){
-
-    if(!document.fullscreenElement){
-        document.documentElement.requestFullscreen();
-        document.body.classList.add("fullscreen");
-    } else {
-        document.exitFullscreen();
-        document.body.classList.remove("fullscreen");
-    }
 }
 
 /* =========================
