@@ -2,50 +2,125 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>MultiViewTube</title>
 
 <style>
+
 body{
     margin:0;
-    background:#111;
+    background:#0f0f0f;
     color:white;
     font-family:Arial;
 }
 
+/* topo */
 #top{
     padding:10px;
+    background:#1a1a1a;
+    position:sticky;
+    top:0;
 }
 
 textarea{
     width:100%;
-    height:100px;
+    height:90px;
+    border-radius:8px;
+    border:none;
+    padding:8px;
+    font-size:14px;
 }
 
 button{
     width:100%;
     height:45px;
-    margin-top:5px;
+    margin-top:6px;
+    border:none;
+    border-radius:8px;
+    background:#ff0055;
+    color:white;
+    font-weight:bold;
 }
 
+/* grid principal */
 #grid{
     display:grid;
-    gap:5px;
-    padding:5px;
+    gap:6px;
+    padding:6px;
 }
+
+/* card de cada live */
+.card{
+    background:#1e1e1e;
+    border-radius:10px;
+    overflow:hidden;
+    position:relative;
+}
+
+/* header da live */
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:4px;
+    font-size:12px;
+    background:#111;
+}
+
+/* botões pequenos */
+.smallbtn{
+    font-size:10px;
+    padding:3px;
+    margin-left:2px;
+    border-radius:4px;
+}
+
+/* iframe */
+iframe{
+    width:100%;
+    height:180px;
+    border:none;
+}
+
+.offline{
+    color:red;
+    font-size:11px;
+}
+
+.fullscreen{
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    z-index:9999;
+    background:black;
+}
+
 </style>
 </head>
 
 <body>
 
 <div id="top">
-<textarea id="links" placeholder="Cole links separados por vírgula"></textarea>
+
+<textarea id="links"
+placeholder="Cole links sem vírgula ou espaço"></textarea>
+
 <button onclick="carregar()">CARREGAR MOSAICO</button>
+
+<button onclick="fullscreenGeral()">TELA CHEIA GERAL</button>
+
+<button onclick="toggleNomes()">OCULTAR/EXIBIR NOMES</button>
+
 </div>
 
 <div id="grid"></div>
 
 <script>
+
+let mostrarNomes = true;
 
 function extrairID(url){
     let match = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
@@ -56,38 +131,85 @@ function carregar(){
 
     let raw = document.getElementById("links").value;
 
-    let links = raw.split(/[\n,]+/).map(x => x.trim()).filter(Boolean);
+    raw = raw.replace(/\s/g,"");
+
+    let links = raw.split("https://").filter(Boolean)
+                   .map(l=>"https://"+l)
+                   .slice(0,8);
 
     let grid = document.getElementById("grid");
     grid.innerHTML = "";
 
-    let cols = 1;
-    if(links.length == 2) cols = 2;
-    else if(links.length <= 4) cols = 2;
-    else cols = 4;
+    let cols = links.length <=2 ? 2 : 4;
 
-    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-
-    links = links.slice(0,8);
+    grid.style.gridTemplateColumns =
+        `repeat(${cols},1fr)`;
 
     links.forEach((url,i)=>{
 
         let id = extrairID(url);
 
-        let div = document.createElement("div");
-        div.style.height = "200px";
-        div.style.background = "#222";
-        div.innerHTML = `
+        let card = document.createElement("div");
+        card.className = "card";
+
+        card.innerHTML = `
+
+            <div class="header">
+                <span class="nome">LIVE ${i+1}</span>
+
+                <div>
+                    <button class="smallbtn"
+                    onclick="mute(this)">🔇</button>
+
+                    <button class="smallbtn"
+                    onclick="full(this)">⛶</button>
+                </div>
+            </div>
+
             <iframe
-                width="100%"
-                height="100%"
-                src="https://www.youtube.com/embed/${id}"
-                allow="autoplay; encrypted-media"
-                allowfullscreen>
+            src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1"
+            allow="autoplay; encrypted-media"
+            allowfullscreen>
             </iframe>
         `;
 
-        grid.appendChild(div);
+        grid.appendChild(card);
+    });
+}
+
+/* mute simples (toggle visual) */
+function mute(btn){
+    btn.parentElement.parentElement.nextElementSibling.muted = true;
+    alert("Mute visual (YouTube não permite controle direto total via iframe)");
+}
+
+/* fullscreen individual */
+function full(btn){
+
+    let card =
+        btn.closest(".card");
+
+    if(!document.fullscreenElement){
+        card.requestFullscreen();
+    }else{
+        document.exitFullscreen();
+    }
+}
+
+/* fullscreen geral */
+function fullscreenGeral(){
+    document.documentElement.requestFullscreen();
+}
+
+/* nomes */
+function toggleNomes(){
+
+    mostrarNomes = !mostrarNomes;
+
+    document.querySelectorAll(".nome")
+    .forEach(n=>{
+        n.style.display =
+            mostrarNomes ? "inline" : "none";
     });
 }
 
