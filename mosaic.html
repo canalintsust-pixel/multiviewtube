@@ -8,10 +8,6 @@
 
 <style>
 
-/* =========================
-   BASE IMERSIVO
-========================= */
-
 html, body {
     margin:0;
     padding:0;
@@ -25,7 +21,7 @@ html, body {
 }
 
 /* =========================
-   STAGE 16:9 CENTRAL
+   GRID 16:9 CENTRAL
 ========================= */
 
 #stage {
@@ -45,14 +41,14 @@ html, body {
     background:black;
 }
 
-/* TILE */
 .tile {
+    position:relative;
     width:100%;
     height:100%;
     background:#000;
+    overflow:hidden;
 }
 
-/* iframe */
 iframe {
     width:100%;
     height:100%;
@@ -60,7 +56,7 @@ iframe {
 }
 
 /* =========================
-   OVERLAY
+   OVERLAY INTELIGENTE
 ========================= */
 
 #overlay {
@@ -92,12 +88,15 @@ button {
 }
 
 /* =========================
-   MODAL
+   MODAL BASE
 ========================= */
 
-#modal {
+.modal {
     position:fixed;
-    inset:0;
+    top:0;
+    left:0;
+    right:0;
+    bottom:0;
     background:rgba(0,0,0,0.85);
     display:none;
     align-items:center;
@@ -105,31 +104,44 @@ button {
     z-index:10000;
 }
 
-#modalBox {
+.modalContent {
     background:#111;
     padding:15px;
     border-radius:10px;
     width:85%;
-    max-width:320px;
+    max-height:80%;
+    overflow:auto;
     color:white;
 }
 
-.list button {
-    width:100%;
-    margin:3px 0;
-    padding:8px;
-    background:#222;
-    border:1px solid #333;
-}
-
-.list button.active {
-    background:#ff0000;
-}
-
-input {
-    width:100%;
-    padding:8px;
+.gridList {
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:8px;
     margin-top:10px;
+}
+
+.item {
+    background:#222;
+    padding:10px;
+    border-radius:6px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+/* =========================
+   CHECKBOX GRANDE TOUCH
+========================= */
+
+input[type="checkbox"]{
+    transform:scale(1.4);
+}
+
+/* fullscreen safe */
+.fullscreen #overlay {
+    opacity:0;
+    pointer-events:none;
 }
 
 </style>
@@ -143,27 +155,41 @@ input {
     <button onclick="openReplace()">SUBSTITUIR</button>
 </div>
 
-<!-- MODAL -->
-<div id="modal">
-    <div id="modalBox"></div>
-</div>
-
 <!-- GRID -->
 <div id="stage"></div>
+
+<!-- MODAL SWAP -->
+<div id="swapModal" class="modal">
+    <div class="modalContent">
+        <h3>Trocar posições</h3>
+        <p>Selecione 2 lives</p>
+
+        <div id="swapList" class="gridList"></div>
+
+        <button id="swapBtn" onclick="confirmSwap()" disabled>
+            TROCAR POSIÇÃO
+        </button>
+
+        <button onclick="closeSwap()">CANCELAR</button>
+    </div>
+</div>
+
+<!-- MODAL REPLACE -->
+<div id="replaceModal" class="modal">
+    <div class="modalContent">
+        <h3>Substituir live</h3>
+
+        <select id="replaceSelect"></select>
+        <input id="replaceInput" placeholder="Cole nova URL" style="width:100%;padding:8px;margin-top:10px;">
+
+        <button onclick="confirmReplace()">OK</button>
+        <button onclick="closeReplace()">CANCELAR</button>
+    </div>
+</div>
 
 <script>
 
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
-
-/* =========================
-   YOUTUBE ID
-========================= */
-
-function extractID(url){
-    if(!url) return null;
-    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return m ? m[2] : null;
-}
 
 /* =========================
    OVERLAY AUTO HIDE
@@ -208,7 +234,6 @@ function load(){
     stage.innerHTML = "";
 
     let n = Math.min(videos.length, 6);
-
     layout(n);
 
     for(let i=0;i<n;i++){
@@ -231,84 +256,106 @@ function load(){
 }
 
 /* =========================
-   SWAP (A/B)
+   YOUTUBE ID
 ========================= */
 
-let swapA = null;
-let swapB = null;
+function extractID(url){
+    if(!url) return null;
+    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    return m ? m[2] : null;
+}
+
+/* =========================
+   SWAP SYSTEM (CHECKLIST)
+========================= */
+
+let swapSelected = [];
 
 function openSwap(){
 
-    let modal = document.getElementById("modal");
-    let box = document.getElementById("modalBox");
+    let modal = document.getElementById("swapModal");
+    let list = document.getElementById("swapList");
 
-    swapA = null;
-    swapB = null;
-
-    box.innerHTML = `<h3>Trocar posição</h3>`;
-
-    let list = `<div class="list">`;
+    list.innerHTML = "";
+    swapSelected = [];
 
     videos.forEach((v,i)=>{
-        list += `<button onclick="selectSwap(${i})">Live ${i+1}</button>`;
+
+        let div = document.createElement("div");
+        div.className = "item";
+
+        div.innerHTML = `
+            Live ${i+1}
+            <input type="checkbox" onchange="toggleSwap(${i}, this)">
+        `;
+
+        list.appendChild(div);
     });
 
-    list += `</div>
-    <button onclick="confirmSwap()">OK TROCAR</button>`;
-
-    box.innerHTML += list;
-
+    document.getElementById("swapBtn").disabled = true;
     modal.style.display = "flex";
 }
 
-function selectSwap(i){
+function toggleSwap(index, el){
 
-    if(swapA === null){
-        swapA = i;
+    if(el.checked){
+
+        if(swapSelected.length === 2){
+            let removed = swapSelected.shift();
+            document.querySelectorAll("input")[removed].checked = false;
+        }
+
+        swapSelected.push(index);
+
     } else {
-        swapB = i;
+        swapSelected = swapSelected.filter(i => i !== index);
     }
+
+    document.getElementById("swapBtn").disabled = swapSelected.length !== 2;
 }
 
 function confirmSwap(){
 
-    if(swapA === null || swapB === null) return;
+    let a = swapSelected[0];
+    let b = swapSelected[1];
 
-    let tmp = videos[swapA];
-    videos[swapA] = videos[swapB];
-    videos[swapB] = tmp;
+    let tmp = videos[a];
+    videos[a] = videos[b];
+    videos[b] = tmp;
 
     localStorage.setItem("videos", JSON.stringify(videos));
 
-    closeModal();
+    closeSwap();
     load();
 }
 
-/* =========================
-   REPLACE
-========================= */
+function closeSwap(){
+    document.getElementById("swapModal").style.display = "none";
+}
 
-let replaceIndex = null;
+/* =========================
+   REPLACE SYSTEM
+========================= */
 
 function openReplace(){
 
-    let modal = document.getElementById("modal");
-    let box = document.getElementById("modalBox");
-
-    box.innerHTML = `<h3>Substituir live</h3>`;
+    let sel = document.getElementById("replaceSelect");
+    sel.innerHTML = "";
 
     videos.forEach((v,i)=>{
-        box.innerHTML += `<button onclick="pickReplace(${i})">Live ${i+1}</button>`;
+        let opt = document.createElement("option");
+        opt.value = i;
+        opt.innerText = `Live ${i+1}`;
+        sel.appendChild(opt);
     });
 
-    modal.style.display = "flex";
+    document.getElementById("replaceModal").style.display = "flex";
 }
 
-function pickReplace(i){
+function confirmReplace(){
 
-    replaceIndex = i;
-
-    let url = prompt("Cole nova live:");
+    let i = document.getElementById("replaceSelect").value;
+    let url = document.getElementById("replaceInput").value;
 
     if(!url) return;
 
@@ -316,16 +363,12 @@ function pickReplace(i){
 
     localStorage.setItem("videos", JSON.stringify(videos));
 
-    closeModal();
+    closeReplace();
     load();
 }
 
-/* =========================
-   MODAL
-========================= */
-
-function closeModal(){
-    document.getElementById("modal").style.display = "none";
+function closeReplace(){
+    document.getElementById("replaceModal").style.display = "none";
 }
 
 /* =========================
