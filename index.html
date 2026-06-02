@@ -3,273 +3,66 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MultiViewTube Pro</title>
+<title>MultiViewTube</title>
 
 <style>
 body{
     margin:0;
-    background:#0f0f0f;
+    background:#111;
     color:white;
     font-family:Arial;
-}
-
-/* TOP BAR FIXA */
-#top{
-    position:sticky;
-    top:0;
-    background:#1a1a1a;
     padding:10px;
-    z-index:10;
 }
 
 textarea{
     width:100%;
-    height:80px;
-    border-radius:8px;
-    border:none;
+    height:120px;
+}
+
+input{
+    width:100%;
     padding:8px;
+    margin-top:5px;
 }
 
 button{
     width:100%;
-    height:42px;
-    margin-top:5px;
-    border:none;
-    border-radius:8px;
-    background:#ff0000;
-    color:white;
-    font-weight:bold;
-}
-
-/* GRID */
-#grid{
-    display:grid;
-    gap:6px;
-    padding:6px;
-}
-
-/* CARD */
-.card{
-    position:relative;
-    background:#000;
-    border-radius:10px;
-    overflow:hidden;
-    aspect-ratio:16/9;
-}
-
-/* NAME */
-.name{
-    position:absolute;
-    top:5px;
-    left:5px;
-    background:rgba(0,0,0,0.6);
-    padding:3px 6px;
-    font-size:12px;
-    z-index:2;
-}
-
-/* CONTROLES */
-.controls{
-    position:absolute;
-    bottom:5px;
-    right:5px;
-    display:flex;
-    gap:5px;
-    z-index:2;
-}
-
-.controls button{
-    width:auto;
-    height:28px;
-    font-size:11px;
-    padding:2px 6px;
-    background:#333;
-}
-
-/* FULLSCREEN OVERLAY */
-.fullscreen-mode{
-    position:fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    background:black;
-    z-index:999;
-    display:none;
-}
-
-.fullscreen-controls{
-    position:absolute;
-    top:10px;
-    right:10px;
-    z-index:1000;
-    display:none;
-}
-
-.fullscreen-controls button{
-    width:auto;
-    background:#ff0000;
+    height:50px;
+    margin-top:10px;
 }
 </style>
 </head>
 
 <body>
 
-<div id="top">
+<h2>MultiViewTube</h2>
 
-<textarea id="links" placeholder="Cole links colados juntos (sem vírgula)"></textarea>
+<textarea id="links" placeholder="cole links sem vírgula"></textarea>
 
-<button onclick="carregar()">CARREGAR MOSAICO</button>
-<button onclick="toggleNames()">OCULTAR / MOSTRAR NOMES</button>
-<button onclick="toggleFullscreenMode()">TELA CHEIA GERAL</button>
+<input id="names" placeholder="nomes separados por vírgula">
 
-</div>
-
-<div id="grid"></div>
-
-<div id="fullscreen" class="fullscreen-mode"></div>
-
-<div id="fsControls" class="fullscreen-controls">
-    <button onclick="exitFS()">Sair</button>
-</div>
+<button onclick="go()">CARREGAR MOSAICO</button>
 
 <script>
 
-let nomesVisiveis = true;
-let fullscreenActive = false;
+function go(){
 
-function extrairID(url){
-    let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    return m ? m[2] : null;
-}
+    let raw = document.getElementById("links").value;
+    let names = document.getElementById("names").value.split(",");
 
-/* CARREGAR MOSAICO */
-function carregar(){
+    raw = raw.replace(/\s/g,"");
+    let links = raw.split("https://").filter(Boolean);
+    links = links.map(l=>"https://"+l);
 
-    let raw = document.getElementById("links").value.replace(/\s/g,"");
+    let data = links.map((u,i)=>({
+        url:u,
+        name:names[i] || ""
+    }));
 
-    let links = raw.split("https://").filter(Boolean)
-        .map(l=>"https://"+l)
-        .slice(0,8);
+    localStorage.setItem("mv_data", JSON.stringify(data));
 
-    let grid = document.getElementById("grid");
-    grid.innerHTML="";
+    window.location.href = "mosaic.html";
 
-    let cols = links.length<=2 ? 2 : (links.length<=4 ? 2 : 4);
-
-    grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-
-    links.forEach((url,i)=>{
-
-        let id = extrairID(url);
-
-        let card = document.createElement("div");
-        card.className="card";
-
-        card.setAttribute("data-url", url);
-        card.setAttribute("data-index", i);
-
-        card.innerHTML = `
-            <div class="name" contenteditable="true">Live ${i+1}</div>
-
-            <div class="controls">
-
-                <button onclick="moveLeft(this)">⬅</button>
-                <button onclick="moveRight(this)">➡</button>
-                <button onclick="reload(this)">🔄</button>
-
-            </div>
-
-            <iframe
-                src="https://www.youtube.com/embed/${id}?autoplay=1"
-                allow="autoplay; encrypted-media"
-                allowfullscreen>
-            </iframe>
-        `;
-
-        grid.appendChild(card);
-    });
-}
-
-/* TROCAR LINK (reload individual) */
-function reload(btn){
-
-    let card = btn.closest(".card");
-    let iframe = card.querySelector("iframe");
-
-    let url = card.getAttribute("data-url");
-    let id = extrairID(url);
-
-    iframe.src = "https://www.youtube.com/embed/"+id+"?autoplay=1";
-}
-
-/* TROCA DE POSIÇÃO */
-function moveLeft(btn){
-
-    let card = btn.closest(".card");
-    let prev = card.previousElementSibling;
-
-    if(prev){
-        card.parentNode.insertBefore(card, prev);
-    }
-}
-
-function moveRight(btn){
-
-    let card = btn.closest(".card");
-    let next = card.nextElementSibling;
-
-    if(next){
-        card.parentNode.insertBefore(next, card);
-    }
-}
-
-/* NOMES */
-function toggleNames(){
-
-    nomesVisiveis = !nomesVisiveis;
-
-    document.querySelectorAll(".name")
-    .forEach(n=>{
-        n.style.display = nomesVisiveis ? "block" : "none";
-    });
-}
-
-/* FULLSCREEN GERAL */
-function toggleFullscreenMode(){
-
-    let fs = document.getElementById("fullscreen");
-    let controls = document.getElementById("fsControls");
-    let grid = document.getElementById("grid");
-
-    if(!fullscreenActive){
-
-        fullscreenActive = true;
-
-        fs.innerHTML = grid.innerHTML;
-
-        fs.style.display = "block";
-        controls.style.display = "block";
-
-        document.body.style.overflow="hidden";
-
-    }else{
-
-        exitFS();
-    }
-}
-
-function exitFS(){
-
-    let fs = document.getElementById("fullscreen");
-    let controls = document.getElementById("fsControls");
-
-    fs.style.display = "none";
-    controls.style.display = "none";
-
-    fullscreenActive = false;
-
-    document.body.style.overflow="auto";
 }
 
 </script>
