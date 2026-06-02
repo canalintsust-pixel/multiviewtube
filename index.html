@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MultiViewTube</title>
+
+<style>
+body{
+    margin:0;
+    background:#111;
+    color:white;
+    font-family:Arial;
+}
+
+#top{
+    padding:10px;
+}
+
+textarea{
+    width:100%;
+    height:100px;
+}
+
+button{
+    width:100%;
+    height:45px;
+    margin-top:5px;
+}
+
+#grid{
+    display:grid;
+    gap:5px;
+    padding:5px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="top">
+<textarea id="links" placeholder="Cole links separados por vírgula"></textarea>
+<button onclick="carregar()">CARREGAR MOSAICO</button>
+</div>
+
+<div id="grid"></div>
+
+<script>
+
+function extrairID(url){
+    let match = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    return match ? match[2] : null;
+}
+
+function carregar(){
+
+    let raw = document.getElementById("links").value;
+
+    let links = raw.split(/[\n,]+/).map(x => x.trim()).filter(Boolean);
+
+    let grid = document.getElementById("grid");
+    grid.innerHTML = "";
+
+    let cols = 1;
+    if(links.length == 2) cols = 2;
+    else if(links.length <= 4) cols = 2;
+    else cols = 4;
+
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+    links = links.slice(0,8);
+
+    links.forEach((url,i)=>{
+
+        let id = extrairID(url);
+
+        let div = document.createElement("div");
+        div.style.height = "200px";
+        div.style.background = "#222";
+        div.innerHTML = `
+            <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube.com/embed/${id}"
+                allow="autoplay; encrypted-media"
+                allowfullscreen>
+            </iframe>
+        `;
+
+        grid.appendChild(div);
+    });
+}
+
+</script>
+
+</body>
+</html>
