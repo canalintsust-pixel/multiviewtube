@@ -9,7 +9,7 @@
 <style>
 
 /* =========================
-   BASE IMERSIVO
+   BASE IMERSIVO TOTAL
 ========================= */
 
 html, body {
@@ -22,45 +22,19 @@ html, body {
 }
 
 /* =========================
-   TOPBAR (OCULTA NO FULLSCREEN FUTURO)
-========================= */
-
-.topbar{
-    display:flex;
-    justify-content:space-between;
-    padding:8px;
-    background:#111;
-    position:fixed;
-    top:0;
-    left:0;
-    right:0;
-    z-index:10;
-}
-
-button{
-    border:none;
-    padding:8px 12px;
-    border-radius:6px;
-    background:#ff0000;
-    color:white;
-    font-size:13px;
-}
-
-/* =========================
-   GRID PRINCIPAL
+   GRID
 ========================= */
 
 #grid{
     display:grid;
-    gap:4px;
     width:100vw;
     height:100vh;
-    padding-top:45px;
+    gap:4px;
     box-sizing:border-box;
 }
 
 /* =========================
-   TILE 16:9 REAL
+   TILE
 ========================= */
 
 .tile{
@@ -68,18 +42,12 @@ button{
     width:100%;
     aspect-ratio:16/9;
     background:#111;
-    border-radius:8px;
     overflow:hidden;
+    border-radius:8px;
     border:1px solid #222;
-    cursor:grab;
 }
 
-/* highlight drag */
-.tile.dragging{
-    opacity:0.5;
-}
-
-/* iframe full */
+/* iframe */
 iframe{
     position:absolute;
     width:100%;
@@ -88,15 +56,39 @@ iframe{
 }
 
 /* =========================
-   FULLSCREEN MODE
+   OVERLAY CONTROLS (IMERSIVO)
 ========================= */
 
-.fullscreen {
-    padding-top:0 !important;
+#overlay{
+    position:fixed;
+    top:10px;
+    right:10px;
+    z-index:9999;
+    display:flex;
+    gap:8px;
+    opacity:0.2;
+    transition:0.2s;
 }
 
-.fullscreen .topbar{
-    display:none;
+#overlay:hover{
+    opacity:1;
+}
+
+.btn{
+    background:#ff0000;
+    color:white;
+    border:none;
+    padding:8px 10px;
+    border-radius:6px;
+    font-size:12px;
+}
+
+/* =========================
+   FULLSCREEN STATE
+========================= */
+
+.fullscreen #overlay{
+    opacity:0; /* some completamente */
 }
 
 </style>
@@ -104,11 +96,15 @@ iframe{
 
 <body>
 
-<div class="topbar">
-<button onclick="toggleFS()">⛶ FULLSCREEN</button>
-<button onclick="reset()">RESET</button>
+<!-- =========================
+     CONTROLES FLUTUANTES
+========================= -->
+
+<div id="overlay">
+    <button class="btn" onclick="toggleFS()">TELA CHEIA</button>
 </div>
 
+<!-- GRID -->
 <div id="grid"></div>
 
 <script>
@@ -118,62 +114,39 @@ iframe{
 ========================= */
 
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
+
 let dragIndex = null;
 
 /* =========================
-   EXTRAI ID YOUTUBE
+   EXTRAI ID
 ========================= */
 
 function extractID(url){
-
     if(!url) return null;
-
     let m = url.match(/(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-
     return m ? m[2] : null;
 }
 
 /* =========================
-   LAYOUT EXATO PEDIDO
+   LAYOUT INTELIGENTE
 ========================= */
 
 function getCols(n){
-
-    // 1 → 1x1
     if(n === 1) return 1;
-
-    // 2 → 2x1
     if(n === 2) return 2;
-
-    // 3 → 4 colunas (layout especial)
     if(n === 3) return 4;
-
-    // 4 → 2x2
     if(n === 4) return 2;
-
-    // 5 → 6 colunas (3 em cima, 2 embaixo centralizados)
     if(n === 5) return 6;
-
-    // 6 → 3x2
     return 3;
 }
 
-/* =========================
-   APLICAR GRID
-========================= */
-
 function applyLayout(n){
-
-    let grid = document.getElementById("grid");
-
-    let cols = getCols(n);
-
-    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-
+    document.getElementById("grid").style.gridTemplateColumns =
+        `repeat(${getCols(n)}, 1fr)`;
 }
 
 /* =========================
-   RENDER PRINCIPAL
+   RENDER
 ========================= */
 
 function load(){
@@ -189,64 +162,83 @@ function load(){
 
         let id = extractID(videos[i]);
 
-        if(!id) continue;
+        let tile = document.createElement("div");
+        tile.className = "tile";
+        tile.dataset.index = i;
+        tile.draggable = true;
 
-        let div = document.createElement("div");
-        div.className = "tile";
-        div.draggable = true;
-        div.dataset.index = i;
-
-        div.innerHTML = `
+        tile.innerHTML = `
             <iframe
                 src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
                 allow="autoplay; encrypted-media; fullscreen"
                 allowfullscreen>
             </iframe>
+
+            <!-- BOTÃO SUBSTITUIR LIVE -->
+            <button onclick="replace(${i})"
+                style="
+                position:absolute;
+                bottom:5px;
+                right:5px;
+                z-index:5;
+                font-size:10px;
+                padding:4px 6px;
+                background:#000000aa;
+                color:white;
+                border:1px solid #555;">
+                TROCAR
+            </button>
         `;
 
         /* =========================
            DRAG START
         ========================= */
 
-        div.addEventListener("dragstart", (e)=>{
+        tile.addEventListener("dragstart", ()=>{
             dragIndex = i;
-            div.classList.add("dragging");
         });
 
-        div.addEventListener("dragend", ()=>{
-            div.classList.remove("dragging");
-        });
-
-        div.addEventListener("dragover", (e)=>{
+        tile.addEventListener("dragover", (e)=>{
             e.preventDefault();
         });
 
-        /* =========================
-           DROP SWAP
-        ========================= */
-
-        div.addEventListener("drop", (e)=>{
+        tile.addEventListener("drop", (e)=>{
             e.preventDefault();
-
-            let targetIndex = i;
 
             if(dragIndex === null) return;
 
-            let temp = videos[dragIndex];
-            videos[dragIndex] = videos[targetIndex];
-            videos[targetIndex] = temp;
+            let tmp = videos[dragIndex];
+            videos[dragIndex] = videos[i];
+            videos[i] = tmp;
 
             localStorage.setItem("videos", JSON.stringify(videos));
 
             load();
         });
 
-        grid.appendChild(div);
+        grid.appendChild(tile);
     }
 }
 
 /* =========================
-   FULLSCREEN IMERSIVO
+   SUBSTITUI LIVE INDIVIDUAL
+========================= */
+
+function replace(index){
+
+    let url = prompt("Cole nova live:");
+
+    if(!url) return;
+
+    videos[index] = url;
+
+    localStorage.setItem("videos", JSON.stringify(videos));
+
+    load();
+}
+
+/* =========================
+   FULLSCREEN IMERSIVO REAL
 ========================= */
 
 function toggleFS(){
@@ -266,18 +258,7 @@ function toggleFS(){
 }
 
 /* =========================
-   RESET
-========================= */
-
-function reset(){
-
-    localStorage.removeItem("videos");
-
-    window.location.href = "index.html";
-}
-
-/* =========================
-   START
+   INÍCIO
 ========================= */
 
 load();
