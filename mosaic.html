@@ -93,10 +93,7 @@ button {
 
 .modal {
     position:fixed;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
+    inset:0;
     background:rgba(0,0,0,0.85);
     display:none;
     align-items:center;
@@ -112,7 +109,27 @@ button {
     max-height:80%;
     overflow:auto;
     color:white;
+    position:relative;
 }
+
+.modalHeader{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+.closeBtn{
+    background:#333;
+    border:none;
+    color:white;
+    padding:6px 10px;
+    border-radius:6px;
+}
+
+/* =========================
+   GRID LIST SWAP
+========================= */
 
 .gridList {
     display:grid;
@@ -128,12 +145,15 @@ button {
     display:flex;
     justify-content:space-between;
     align-items:center;
+    transition:0.2s;
 }
 
-/* =========================
-   CHECKBOX GRANDE TOUCH
-========================= */
+.item.selected{
+    background:#ff000055;
+    border:1px solid #ff0000;
+}
 
+/* checkbox grande */
 input[type="checkbox"]{
     transform:scale(1.4);
 }
@@ -158,10 +178,17 @@ input[type="checkbox"]{
 <!-- GRID -->
 <div id="stage"></div>
 
-<!-- MODAL SWAP -->
-<div id="swapModal" class="modal">
-    <div class="modalContent">
-        <h3>Trocar posições</h3>
+<!-- =========================
+     SWAP MODAL
+========================= -->
+<div id="swapModal" class="modal" onclick="backdropClose(event,'swap')">
+    <div class="modalContent" onclick="event.stopPropagation()">
+
+        <div class="modalHeader">
+            <h3>Trocar posições</h3>
+            <button class="closeBtn" onclick="closeSwap()">X</button>
+        </div>
+
         <p>Selecione 2 lives</p>
 
         <div id="swapList" class="gridList"></div>
@@ -170,20 +197,29 @@ input[type="checkbox"]{
             TROCAR POSIÇÃO
         </button>
 
-        <button onclick="closeSwap()">CANCELAR</button>
     </div>
 </div>
 
-<!-- MODAL REPLACE -->
-<div id="replaceModal" class="modal">
-    <div class="modalContent">
-        <h3>Substituir live</h3>
+<!-- =========================
+     REPLACE MODAL
+========================= -->
+<div id="replaceModal" class="modal" onclick="backdropClose(event,'replace')">
+    <div class="modalContent" onclick="event.stopPropagation()">
+
+        <div class="modalHeader">
+            <h3>Substituir live</h3>
+            <button class="closeBtn" onclick="closeReplace()">X</button>
+        </div>
 
         <select id="replaceSelect"></select>
-        <input id="replaceInput" placeholder="Cole nova URL" style="width:100%;padding:8px;margin-top:10px;">
+
+        <input id="replaceInput"
+               placeholder="Cole nova URL"
+               style="width:100%;padding:8px;margin-top:10px;">
 
         <button onclick="confirmReplace()">OK</button>
         <button onclick="closeReplace()">CANCELAR</button>
+
     </div>
 </div>
 
@@ -192,7 +228,7 @@ input[type="checkbox"]{
 let videos = JSON.parse(localStorage.getItem("videos") || "[]");
 
 /* =========================
-   OVERLAY AUTO HIDE
+   OVERLAY AUTO
 ========================= */
 
 let timer;
@@ -214,7 +250,6 @@ document.body.addEventListener("touchstart", showOverlay);
 ========================= */
 
 function layout(n){
-
     let stage = document.getElementById("stage");
 
     let cols = (n <= 2) ? 2 : (n <= 4 ? 2 : 3);
@@ -225,7 +260,7 @@ function layout(n){
 }
 
 /* =========================
-   RENDER
+   LOAD
 ========================= */
 
 function load(){
@@ -266,7 +301,7 @@ function extractID(url){
 }
 
 /* =========================
-   SWAP SYSTEM (CHECKLIST)
+   SWAP SYSTEM
 ========================= */
 
 let swapSelected = [];
@@ -283,6 +318,7 @@ function openSwap(){
 
         let div = document.createElement("div");
         div.className = "item";
+        div.dataset.index = i;
 
         div.innerHTML = `
             Live ${i+1}
@@ -298,17 +334,28 @@ function openSwap(){
 
 function toggleSwap(index, el){
 
+    let item = document.querySelectorAll(".item")[index];
+
     if(el.checked){
 
         if(swapSelected.length === 2){
+
             let removed = swapSelected.shift();
-            document.querySelectorAll("input")[removed].checked = false;
+
+            let oldItem = document.querySelectorAll(".item")[removed];
+            let oldCheckbox = oldItem.querySelector("input");
+
+            oldCheckbox.checked = false;
+            oldItem.classList.remove("selected");
         }
 
         swapSelected.push(index);
+        item.classList.add("selected");
 
     } else {
+
         swapSelected = swapSelected.filter(i => i !== index);
+        item.classList.remove("selected");
     }
 
     document.getElementById("swapBtn").disabled = swapSelected.length !== 2;
@@ -319,9 +366,7 @@ function confirmSwap(){
     let a = swapSelected[0];
     let b = swapSelected[1];
 
-    let tmp = videos[a];
-    videos[a] = videos[b];
-    videos[b] = tmp;
+    [videos[a], videos[b]] = [videos[b], videos[a]];
 
     localStorage.setItem("videos", JSON.stringify(videos));
 
@@ -369,6 +414,15 @@ function confirmReplace(){
 
 function closeReplace(){
     document.getElementById("replaceModal").style.display = "none";
+}
+
+/* =========================
+   BACKDROP CLOSE
+========================= */
+
+function backdropClose(e,type){
+    if(type === 'swap') closeSwap();
+    if(type === 'replace') closeReplace();
 }
 
 /* =========================
