@@ -285,6 +285,524 @@ const replaceModal = document.getElementById("replaceModal");
 let swapSelection = [];
 
 function openSwapModal() {
+  overlay.style.display = "none";
+
+  selectedCells = [];
+  swapSelection = [];
+
+  mode = "swap";
+
+  swapModal.style.display = "flex";
+
+  const list = document.getElementById("swapList");
+  list.innerHTML = "";
+
+  state.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.textContent = item.channel;
+
+    div.onclick = () => {
+      if (swapSelection.includes(i)) {
+        swapSelection = swapSelection.filter(x => x !== i);
+        div.classList.remove("selected");
+      } else {
+        if (swapSelection.length >= 2) return;
+        swapSelection.push(i);
+        div.classList.add("selected");
+      }
+    };
+
+    list.appendChild(div);
+  });
+}
+
+function closeSwapModal() {
+  swapModal.style.display = "none";
+  swapSelection = [];
+}
+
+function confirmSwap() {
+  if (swapSelection.length !== 2) {
+  alert("Selecione exatamente 2 canais");
+  return;
+}
+
+  const [a, b] = swapSelection;
+
+  const temp = state[a];
+  state[a] = state[b];
+  state[b] = temp;
+
+  saveState();
+  render();
+
+  closeSwapModal();
+
+  mode = null;
+}
+
+/* -------- REPLACE MODAL -------- */
+
+let replaceIndex = null;
+
+function openSwapModal() {
+  overlay.style.display = "none";
+
+  selectedCells = [];
+  swapSelection = [];
+
+  mode = "swap";
+
+  swapModal.style.display = "flex";
+
+  const list = document.getElementById("swapList");
+  list.innerHTML = "";
+
+  state.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.textContent = item.channel;
+
+    div.onclick = () => {
+      if (swapSelection.includes(i)) {
+        swapSelection = swapSelection.filter(x => x !== i);
+        div.classList.remove("selected");
+      } else {
+        if (swapSelection.length >= 2) return;
+        swapSelection.push(i);
+        div.classList.add("selected");
+      }
+    };
+
+    list.appendChild(div);
+  });
+}
+
+function closeReplaceModal() {
+  replaceModal.style.display = "none";
+  replaceIndex = null;
+}
+
+function confirmReplace() {
+  const url = document.getElementById("newUrl").value;
+
+  if (!url || replaceIndex === null) return;
+
+  const match = url.match(/([a-zA-Z0-9_-]{11})/);
+  if (!match) return;
+
+  state[replaceIndex].videoId = match[1];
+
+  saveState();
+  updateCell(replaceIndex, match[1]);
+
+  closeReplaceModal();
+
+  mode = null;
+}
+
+/* ---------------- SWAP ---------------- */
+
+function swapSelected() {
+  if (selectedCells.length !== 2) return;
+
+  const [a, b] = selectedCells;
+
+  const temp = state[a];
+  state[a] = state[b];
+  state[b] = temp;
+
+  saveState();
+  render();
+
+  selectedCells = [];
+}
+function handleSwapSelection(cell, index) {
+  if (selectedCells.includes(index)) {
+    selectedCells = selectedCells.filter(i => i !== index);
+    cell.style.outline = "none";
+    return;
+  }
+
+  selectedCells.push(index);
+  cell.style.outline = "2px solid lime";
+
+  if (selectedCells.length === 2) {
+    swapSelected();
+    mode = null;
+  }
+}
+/* ---------------- REPLACE ---------------- */
+
+function replaceSelected() {
+  if (selectedCells.length !== 1) return;
+
+  const index = selectedCells[0];
+  const url = prompt("Cole nova URL do YouTube (@canal/live ou video)");
+
+  if (!url) return;
+
+  // extrai videoId simples
+  const match = url.match(/([a-zA-Z0-9_-]{11})/);
+
+  if (!match) return;
+
+  state[index].videoId = match[1];
+
+  saveState();
+  updateCell(index, match[1]);
+
+  selectedCells = [];
+}
+
+/* ---------------- LAYOUT CYCLE ---------------- */
+
+let layoutMode = 0;
+function cycleLayout() {
+  layoutMode = (layoutMode + 1) % 3;
+
+  const n = state.length;
+
+  if (layoutMode === 0) setGrid(1,1);
+  if (layoutMode === 1) setGrid(2,2);
+  if (layoutMode === 2) setGrid(3,2);
+}
+
+/* ---------------- UPDATE ALL ---------------- */
+
+async function forceUpdate() {
+  status.textContent = "Atualizando...";
+
+  const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);
+  const data = await res.json();
+
+  state.forEach((item, i) => {
+    const newId = data[item.channel];
+
+    if (newId && newId !== item.videoId) {
+      item.videoId = newId;
+      updateCell(i, newId);
+    }
+  });
+
+  saveState();
+  status.textContent = "AO VIVO";
+}
+
+/* ---------------- PERSIST ---------------- */
+
+function saveState() {
+  localStorage.setItem("mosaicState", JSON.stringify(state));
+}
+
+/* ---------------- LOAD ---------------- */
+
+async function init() {
+  const saved = localStorage.getItem("mosaicState");
+
+  if (saved) {
+    state = JSON.parse(saved);
+    render();
+    return;
+  }
+
+  const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);
+  const data = await res.json();
+
+  state = Object.keys(data).map(ch => ({
+    channel: ch,
+    videoId: data[ch]
+  }));
+
+  saveState();
+  render();
+}
+
+/* ---------------- OVERLAY ---------------- */
+
+function showOverlay() {
+  overlay.style.display = "flex";
+
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(() => {
+    overlay.style.display = "none";
+  }, 2500);
+}
+
+document.body.addEventListener("click", (e) => {
+  if (e.target.closest(".modal")) return;
+  if (e.target.closest("iframe")) return;
+  if (e.target.classList.contains("btn")) return;
+
+  if (mode && !e.target.closest(".modal") && !e.target.closest(".btn")) return;
+
+  showOverlay();
+});
+
+/* ---------------- ACTION HOOKS ---------------- */
+
+window.openSwapModal = openSwapModal;
+window.openReplaceModal = openReplaceModal;
+window.cycleLayout = cycleLayout;
+window.forceUpdate = forceUpdate;
+
+/* ---------------- START ---------------- */
+
+init();
+setInterval(forceUpdate, 60000);
+</script>
+
+</body>
+</html>
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    /* ---------------- OVERLAY ---------------- */
+
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      z-index: 999;
+    }
+
+    .btn {
+      padding: 12px 18px;
+      background: #222;
+      color: white;
+      border: 1px solid #444;
+      border-radius: 8px;
+      font-family: Arial;
+      cursor: pointer;
+      min-width: 180px;
+      text-align: center;
+    }
+
+    .btn:hover {
+      background: #333;
+    }
+
+    #status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #aaa;
+      font-family: Arial;
+      font-size: 12px;
+      z-index: 10;
+    }
+    
+    /* ================= MODAIS ================= */
+
+.modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1500;
+}
+
+.modalBox {
+  background: #111;
+  padding: 20px;
+  border-radius: 10px;
+  width: 300px;
+  color: white;
+  font-family: Arial;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.modalHeader button {
+  background: transparent;
+  color: white;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+#swapList div,
+#replaceList div {
+  padding: 8px;
+  margin: 4px 0;
+  background: #222;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+#swapList div.selected,
+#replaceList div.selected {
+  outline: 2px solid lime;
+}
+  </style>
+</head>
+
+<body>
+
+<div id="canvas"></div>
+<div id="status">Carregando...</div>
+
+<div id="overlay">
+  <div class="btn" onclick="openSwapModal()">TROCAR</div>
+<div class="btn" onclick="openReplaceModal()">SUBSTITUIR</div>
+  <div class="btn" onclick="cycleLayout()">LAYOUT</div>
+  <div class="btn" onclick="forceUpdate()">ATUALIZAR TODAS</div>
+</div>
+
+<!-- ================= MODAL SWAP ================= -->
+<div id="swapModal" class="modal">
+  <div class="modalBox">
+    <div class="modalHeader">
+      <span>TROCAR POSIÇÕES</span>
+      <button onclick="closeSwapModal()">X</button>
+    </div>
+
+    <div id="swapList"></div>
+
+    <button onclick="confirmSwap()">TROCAR POSIÇÃO</button>
+  </div>
+</div>
+
+<!-- ================= MODAL REPLACE ================= -->
+<div id="replaceModal" class="modal">
+  <div class="modalBox">
+    <div class="modalHeader">
+      <span>SUBSTITUIR LIVE</span>
+      <button onclick="closeReplaceModal()">X</button>
+    </div>
+
+    <div id="replaceList"></div>
+
+    <input id="newUrl" placeholder="Cole nova URL" />
+    <button onclick="confirmReplace()">SUBSTITUIR</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const overlay = document.getElementById("overlay");
+const status = document.getElementById("status");
+
+const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
+const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
+
+/* ---------------- STATE ---------------- */
+
+let state = []; // [{channel, videoId}]
+let selectedCells = [];
+let mode = null; // "swap" | "replace"
+let overlayTimer = null;
+
+/* ---------------- GRID ---------------- */
+
+function setGrid(c, r) {
+  canvas.style.gridTemplateColumns = `repeat(${c}, 1fr)`;
+  canvas.style.gridTemplateRows = `repeat(${r}, 1fr)`;
+}
+
+/* ---------------- EMBED ---------------- */
+
+function buildEmbed(id) {
+  return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
+}
+
+/* ---------------- CELL ---------------- */
+
+function createCell(item, index) {
+  const div = document.createElement("div");
+  div.className = "cell";
+  div.dataset.index = index;
+
+  const iframe = document.createElement("iframe");
+  iframe.src = buildEmbed(item.videoId);
+
+  div.appendChild(iframe);
+
+  div.onclick = () => toggleSelect(div, index);
+
+  return div;
+}
+
+function updateCell(index, videoId) {
+  const cell = canvas.querySelector(`[data-index="${index}"]`);
+  if (!cell) return;
+
+  const iframe = cell.querySelector("iframe");
+  iframe.src = buildEmbed(videoId);
+}
+
+/* ---------------- SELECTION ---------------- */
+
+
+function toggleSelect(cell, index) {
+  // MODO SWAP
+  if (mode === "swap") {
+    handleSwapSelection(cell, index);
+    return;
+  }
+
+  // MODO REPLACE
+  if (mode === "replace") {
+    selectedCells = [index];
+    replaceSelected();
+    mode = null;
+    return;
+  }
+
+  // fallback visual (modo normal)
+  if (selectedCells.includes(index)) {
+    selectedCells = selectedCells.filter(i => i !== index);
+    cell.style.outline = "none";
+  } else {
+    if (selectedCells.length >= 2) return;
+
+    selectedCells.push(index);
+    cell.style.outline = "2px solid lime";
+  }
+}
+
+/* ---------------- LAYOUT ---------------- */
+
+function applyLayout(n) {
+  if (n === 1) setGrid(1,1);
+  else if (n === 2) setGrid(2,1);
+  else if (n <= 4) setGrid(2,2);
+  else setGrid(3,2);
+}
+
+/* ---------------- RENDER ---------------- */
+
+function render() {
+  canvas.innerHTML = "";
+  applyLayout(state.length);
+
+  state.forEach((item, i) => {
+    const cell = createCell(item, i);
+    canvas.appendChild(cell);
+  });
+}
+
+/* ================= MODAIS ================= */
+
+const swapModal = document.getElementById("swapModal");
+const replaceModal = document.getElementById("replaceModal");
+
+let swapSelection = [];
+
+function openSwapModal() {
   selectedCells = [];
   swapSelection = [];
 
