@@ -1,387 +1,316 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<meta charset="utf-8">
-<meta name="viewport"
-content="width=device-width,
-initial-scale=1,
-maximum-scale=1,
-user-scalable=no">
-
-<title>MultiView Mosaic</title>
+<title>MultiViewTube</title>
 
 <style>
 
-/* =====================================
-   BASE
-===================================== */
-
 html,
 body{
-
     margin:0;
     padding:0;
-
     width:100%;
     height:100%;
-
-    background:#000;
-
     overflow:hidden;
-
-    position:fixed;
-    inset:0;
-
-    font-family:Arial,sans-serif;
+    background:#000;
+    font-family:Arial,Helvetica,sans-serif;
 }
 
-/* =====================================
-   CANVAS 16:9
-===================================== */
+/* =====================================================
+   CANVAS 16:9 FIXO
+===================================================== */
 
-#stage{
+body{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
 
-    position:absolute;
-
-    top:50%;
-    left:50%;
-
-    transform:translate(-50%,-50%);
+#canvas{
+    position:relative;
 
     width:100vw;
-    height:calc(100vw * 9 / 16);
+    height:56.25vw;
 
-    max-width:calc(100vh * 16 / 9);
     max-height:100vh;
+    max-width:177.777vh;
 
     background:#000;
 
     display:grid;
 
-    gap:2px;
-
     overflow:hidden;
 }
 
-/* =====================================
-   TILES
-===================================== */
+/* =====================================================
+   CÉLULAS DOS VÍDEOS
+===================================================== */
 
-.tile{
-
+.cell{
     position:relative;
-
-    width:100%;
-    height:100%;
-
-    background:#000;
-
     overflow:hidden;
+    background:#000;
 }
 
-.tile iframe{
+.cell.selected{
+    outline:4px solid #00ff66;
+    z-index:5;
+}
 
+iframe{
     width:100%;
     height:100%;
-
     border:none;
-
-    display:block;
+    background:#000;
 }
 
-/* =====================================
-   OVERLAY
-===================================== */
+/* =====================================================
+   OVERLAY PRINCIPAL
+===================================================== */
 
 #overlay{
-
     position:fixed;
+    inset:0;
 
-    top:10px;
-    right:10px;
+    display:none;
 
-    z-index:9999;
+    justify-content:center;
+    align-items:center;
 
+    background:rgba(0,0,0,.55);
+
+    z-index:9000;
+}
+
+.overlay-box{
     display:flex;
-
-    gap:6px;
-
-    opacity:0;
-
-    pointer-events:none;
-
-    transition:opacity .25s;
+    flex-direction:column;
+    gap:12px;
 }
 
-#overlay.show{
+.overlay-btn{
+    min-width:220px;
 
-    opacity:1;
-
-    pointer-events:auto;
-}
-
-.ctrlBtn{
+    padding:14px;
 
     border:none;
-
-    background:#ff0000;
-
-    color:#fff;
-
-    padding:10px 12px;
 
     border-radius:8px;
 
-    font-size:13px;
+    background:#1f1f1f;
 
-    font-weight:bold;
+    color:#fff;
+
+    font-size:16px;
+
+    cursor:pointer;
 }
 
-/* =====================================
-   MODAL
-===================================== */
+.overlay-btn:active{
+    transform:scale(.98);
+}
 
-.modal{
+/* =====================================================
+   MODAIS
+===================================================== */
 
+.modal-backdrop{
     position:fixed;
 
     inset:0;
 
-    background:rgba(0,0,0,.88);
-
     display:none;
 
+    justify-content:center;
     align-items:center;
 
-    justify-content:center;
+    background:rgba(0,0,0,.75);
 
-    z-index:10000;
+    z-index:9500;
 }
 
-.modalContent{
+.modal{
+    width:min(90vw,500px);
 
-    position:relative;
-
-    width:85%;
-
-    max-width:700px;
-
-    max-height:85%;
+    max-height:80vh;
 
     overflow:auto;
 
     background:#111;
 
-    border-radius:12px;
-
-    padding:18px;
-
     color:white;
+
+    border-radius:10px;
+
+    padding:20px;
+
+    box-sizing:border-box;
 }
 
-/* =====================================
-   CLOSE BUTTON
-===================================== */
+.modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
 
-.closeBtn{
+    margin-bottom:15px;
+}
 
-    position:absolute;
+.modal-title{
+    font-size:20px;
+    font-weight:bold;
+}
 
-    top:10px;
-    right:10px;
+.close-btn{
+    width:36px;
+    height:36px;
 
     border:none;
 
-    background:#444;
+    border-radius:50%;
 
-    color:white;
+    background:#333;
 
-    border-radius:6px;
+    color:#fff;
 
-    padding:6px 10px;
+    cursor:pointer;
 
-    font-size:12px;
+    font-size:18px;
 }
 
-/* =====================================
-   SWAP GRID
-===================================== */
+.close-btn:active{
+    transform:scale(.95);
+}
 
-.gridList{
+/* =====================================================
+   LISTAS DOS MODAIS
+===================================================== */
 
-    display:grid;
-
-    grid-template-columns:
-    repeat(2,1fr);
+.live-item{
+    display:flex;
+    align-items:center;
 
     gap:10px;
 
-    margin-top:15px;
-}
+    padding:10px;
 
-.item{
-
-    background:#222;
-
-    border:2px solid transparent;
+    border:1px solid #333;
 
     border-radius:8px;
 
-    padding:12px;
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:space-between;
-
-    transition:.2s;
+    margin-bottom:8px;
 }
 
-.item.selected{
-
-    background:#2a2a2a;
-
-    border-color:#00ff88;
-
-    transform:scale(1.03);
+.live-item input[type="checkbox"]{
+    width:22px;
+    height:22px;
 }
 
-.swapCheck{
-
-    transform:scale(1.5);
+.live-label{
+    flex:1;
+    font-size:15px;
 }
 
-/* =====================================
-   FORM
-===================================== */
+/* =====================================================
+   INPUT URL
+===================================================== */
 
-.modal input,
-.modal select{
-
+.modal-input{
     width:100%;
 
     box-sizing:border-box;
 
+    padding:12px;
+
+    border:none;
+
+    border-radius:8px;
+
     margin-top:10px;
 
-    padding:10px;
+    margin-bottom:15px;
+}
+
+/* =====================================================
+   BOTÕES DOS MODAIS
+===================================================== */
+
+.action-btn{
+    width:100%;
+
+    padding:14px;
 
     border:none;
 
     border-radius:8px;
 
-    background:#222;
+    background:#0066ff;
 
     color:white;
+
+    font-size:16px;
+
+    cursor:pointer;
 }
 
-.modalAction{
+.action-btn:disabled{
+    opacity:.4;
+    cursor:not-allowed;
+}
 
-    margin-top:12px;
+/* =====================================================
+   TOAST TEMPORÁRIO
+===================================================== */
+
+#toast{
+    position:fixed;
+
+    left:50%;
+    bottom:30px;
+
+    transform:translateX(-50%);
+
+    background:rgba(20,20,20,.95);
+
+    color:#fff;
+
+    padding:12px 18px;
+
+    border-radius:8px;
+
+    display:none;
+
+    z-index:99999;
+}
+
+/* =====================================================
+   BOTÃO VOLTAR
+===================================================== */
+
+#backBtn{
+    position:fixed;
+
+    top:12px;
+    left:12px;
+
+    width:44px;
+    height:44px;
 
     border:none;
 
-    border-radius:8px;
+    border-radius:50%;
 
-    padding:10px 12px;
-
-    background:#ff0000;
+    background:rgba(0,0,0,.7);
 
     color:white;
 
-    font-weight:bold;
-}
+    font-size:22px;
 
-/* =====================================
-   LAYOUT MODAL
-===================================== */
+    z-index:9100;
 
-.layoutOption{
-
-    display:flex;
-
-    align-items:center;
-
-    gap:10px;
-
-    margin-top:12px;
-
-    padding:10px;
-
-    border-radius:8px;
-
-    background:#222;
-}
-
-.layoutOption input{
-
-    width:auto;
-
-    margin:0;
-
-    transform:scale(1.4);
-}
-
-/* =====================================
-   LAYOUT 2
-   DESTAQUE DIREITO
-===================================== */
-
-.layout-right{
-
-    display:grid;
-
-    grid-template-columns:
-    3fr 1fr;
-
-    grid-template-rows:
-    repeat(3,1fr);
-
-    gap:2px;
-}
-
-/* =====================================
-   LAYOUT 3
-   DUPLO DESTAQUE
-===================================== */
-
-.layout-double{
-
-    display:grid;
-
-    grid-template-columns:
-    repeat(4,1fr);
-
-    grid-template-rows:
-    2fr 1fr;
-
-    gap:2px;
-}
-
-/* =====================================
-   LAYOUT 4
-   ROTATIVO
-===================================== */
-
-.layout-rotate{
-
-    display:grid;
-
-    grid-template-columns:
-    3fr 1fr;
-
-    gap:2px;
-}
-
-/* =====================================
-   HELPERS
-===================================== */
-
-.hidden{
-
-    display:none !important;
+    cursor:pointer;
 }
 
 </style>
@@ -389,71 +318,61 @@ body{
 
 <body>
 
-<!-- =====================================
-     OVERLAY INTELIGENTE
-===================================== -->
+<button id="backBtn">←</button>
+
+<div id="canvas"></div>
+
+<!-- OVERLAY -->
 
 <div id="overlay">
 
-    <button
-        class="ctrlBtn"
-        onclick="openSwap()">
-        TROCAR
-    </button>
+    <div class="overlay-box">
 
-    <button
-        class="ctrlBtn"
-        onclick="openReplace()">
-        SUBSTITUIR
-    </button>
+        <button class="overlay-btn" onclick="openSwapModal()">
+            TROCAR
+        </button>
 
-    <button
-        class="ctrlBtn"
-        onclick="openLayoutModal()">
-        LAYOUT
-    </button>
+        <button class="overlay-btn" onclick="openReplaceModal()">
+            SUBSTITUIR
+        </button>
+
+        <button class="overlay-btn" onclick="cycleLayout()">
+            LAYOUT
+        </button>
+
+        <button class="overlay-btn" onclick="forceUpdate()">
+            ATUALIZAR TODAS
+        </button>
+
+    </div>
 
 </div>
 
-<!-- =====================================
-     CANVAS 16:9
-===================================== -->
+<!-- MODAL TROCAR -->
 
-<div id="stage"></div>
+<div id="swapModal" class="modal-backdrop">
 
-<!-- =====================================
-     MODAL TROCAR POSIÇÃO
-===================================== -->
+    <div class="modal">
 
-<div
-    id="swapModal"
-    class="modal">
+        <div class="modal-header">
 
-    <div class="modalContent">
+            <div class="modal-title">
+                Trocar posições
+            </div>
 
-        <button
-            class="closeBtn"
-            onclick="closeSwap()">
-            ✕
-        </button>
+            <button
+                class="close-btn"
+                onclick="closeSwapModal()">
+                X
+            </button>
 
-        <h2>
-            Trocar posição das lives
-        </h2>
-
-        <p>
-            Selecione duas lives
-        </p>
-
-        <div
-            id="swapList"
-            class="gridList">
         </div>
 
+        <div id="swapList"></div>
+
         <button
-            id="swapBtn"
-            class="modalAction"
-            onclick="confirmSwap()"
+            id="swapConfirmBtn"
+            class="action-btn"
             disabled>
 
             TROCAR POSIÇÃO
@@ -464,41 +383,37 @@ body{
 
 </div>
 
-<!-- =====================================
-     MODAL SUBSTITUIR LIVE
-===================================== -->
+<!-- MODAL SUBSTITUIR -->
 
-<div
-    id="replaceModal"
-    class="modal">
+<div id="replaceModal" class="modal-backdrop">
 
-    <div class="modalContent">
+    <div class="modal">
 
-        <button
-            class="closeBtn"
-            onclick="closeReplace()">
-            ✕
-        </button>
+        <div class="modal-header">
 
-        <h2>
-            Substituir live
-        </h2>
+            <div class="modal-title">
+                Substituir live
+            </div>
 
-        <p>
-            Escolha a live
-        </p>
+            <button
+                class="close-btn"
+                onclick="closeReplaceModal()">
+                X
+            </button>
 
-        <select id="replaceSelect">
-        </select>
+        </div>
+
+        <div id="replaceList"></div>
 
         <input
-            id="replaceInput"
+            id="replaceUrl"
+            class="modal-input"
             type="text"
-            placeholder="Cole aqui a nova URL">
+            placeholder="Cole URL do YouTube">
 
         <button
-            class="modalAction"
-            onclick="confirmReplace()">
+            id="replaceConfirmBtn"
+            class="action-btn">
 
             SUBSTITUIR
 
@@ -508,960 +423,857 @@ body{
 
 </div>
 
-<!-- =====================================
-     MODAL LAYOUT
-===================================== -->
-
-<div
-    id="layoutModal"
-    class="modal">
-
-    <div class="modalContent">
-
-        <button
-            class="closeBtn"
-            onclick="closeLayoutModal()">
-            ✕
-        </button>
-
-        <h2>
-            Layout de exibição
-        </h2>
-
-        <div class="layoutOption">
-
-            <input
-                type="radio"
-                name="layoutMode"
-                id="layout0"
-                value="default">
-
-            <label for="layout0">
-
-                Layout padrão
-
-            </label>
-
-        </div>
-
-        <div class="layoutOption">
-
-            <input
-                type="radio"
-                name="layoutMode"
-                id="layout1"
-                value="right">
-
-            <label for="layout1">
-
-                Uma live grande +
-                coluna lateral
-
-            </label>
-
-        </div>
-
-        <div class="layoutOption">
-
-            <input
-                type="radio"
-                name="layoutMode"
-                id="layout2"
-                value="double">
-
-            <label for="layout2">
-
-                Duas lives grandes +
-                inferiores menores
-
-            </label>
-
-        </div>
-
-        <div class="layoutOption">
-
-            <input
-                type="radio"
-                name="layoutMode"
-                id="layout3"
-                value="rotate">
-
-            <label for="layout3">
-
-                Destaque rotativo
-                automático
-
-            </label>
-
-        </div>
-
-        <button
-            class="modalAction"
-            onclick="applyLayoutMode()">
-
-            APLICAR
-
-        </button>
-
-    </div>
-
-</div>
-
-<!-- =====================================
-     SCRIPT
-===================================== -->
+<div id="toast"></div>
 
 <script>
+   /* =====================================================
+   ELEMENTOS
+===================================================== */
 
-/* =====================================
-   DADOS
-===================================== */
+const canvas = document.getElementById("canvas");
 
-let videos =
+const overlay = document.getElementById("overlay");
+
+const swapModal =
+document.getElementById("swapModal");
+
+const replaceModal =
+document.getElementById("replaceModal");
+
+const swapList =
+document.getElementById("swapList");
+
+const replaceList =
+document.getElementById("replaceList");
+
+const replaceUrl =
+document.getElementById("replaceUrl");
+
+const swapConfirmBtn =
+document.getElementById("swapConfirmBtn");
+
+const replaceConfirmBtn =
+document.getElementById("replaceConfirmBtn");
+
+const toast =
+document.getElementById("toast");
+
+const backBtn =
+document.getElementById("backBtn");
+
+/* =====================================================
+   CONFIG
+===================================================== */
+
+const WORKER_URL =
+"https://polished-smoke-6d50.canalintsust.workers.dev/";
+
+const selectedChannels =
 JSON.parse(
-localStorage.getItem("videos")
-|| "[]"
+localStorage.getItem("selectedChannels") || "[]"
 );
 
-/* =====================================
-   LAYOUT SALVO
-===================================== */
+/* =====================================================
+   ESTADO GLOBAL
+===================================================== */
 
-let currentLayout =
-localStorage.getItem("layoutMode")
-|| "default";
+let state = [];
 
-/* =====================================
-   ROTATIVO
-===================================== */
-
-let featuredIndex = 0;
-
-let rotateTimer = null;
-
-/* =====================================
-   OVERLAY
-===================================== */
+let currentLayout = 0;
 
 let overlayTimer = null;
 
-let modalOpened = false;
+let toastTimer = null;
 
-/* =====================================
-   SWAP
-===================================== */
+let swapSelection = [];
 
-let swapSelected = [];
+let replaceSelection = null;
 
-/* =====================================
-   HELPERS
-===================================== */
+/* =====================================================
+   TOAST
+===================================================== */
 
-function showModal(id){
+function showToast(message){
 
-    modalOpened = true;
+    toast.textContent = message;
 
-    document
-    .getElementById(id)
-    .style.display = "flex";
+    toast.style.display = "block";
+
+    clearTimeout(toastTimer);
+
+    toastTimer = setTimeout(() => {
+
+        toast.style.display = "none";
+
+    },2000);
+
 }
 
-function hideModal(id){
+/* =====================================================
+   EMBED
+===================================================== */
 
-    modalOpened = false;
+function buildEmbed(videoId){
 
-    document
-    .getElementById(id)
-    .style.display = "none";
+    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
+
 }
 
-function saveLayout(){
+/* =====================================================
+   GRID BÁSICO
+===================================================== */
 
-    localStorage.setItem(
-        "layoutMode",
-        currentLayout
-    );
+function setGrid(columns,rows){
+
+    canvas.style.gridTemplateColumns =
+    `repeat(${columns},1fr)`;
+
+    canvas.style.gridTemplateRows =
+    `repeat(${rows},1fr`;
+
 }
 
-function extractID(url){
+/* =====================================================
+   LAYOUT PADRÃO
+===================================================== */
 
-    if(!url)
-        return null;
+function applyDefaultLayout(count){
 
-    let m =
-    url.match(
-    /(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/
-    );
+    canvas.innerHTML = "";
 
-    return m
-    ? m[2]
-    : null;
+    if(count === 1){
+
+        setGrid(1,1);
+
+    }
+
+    else if(count === 2){
+
+        setGrid(2,1);
+
+    }
+
+    else if(count === 3){
+
+        setGrid(2,2);
+
+    }
+
+    else if(count === 4){
+
+        setGrid(2,2);
+
+    }
+
+    else if(count === 5){
+
+        setGrid(3,2);
+
+    }
+
+    else{
+
+        setGrid(3,2);
+
+    }
+
 }
 
-/* =====================================
-   OVERLAY INTELIGENTE
-===================================== */
+/* =====================================================
+   CRIA CÉLULA
+===================================================== */
 
-function showOverlay(){
+function createCell(item,index){
 
-    if(modalOpened)
-        return;
+    const div =
+    document.createElement("div");
 
-    let overlay =
-    document.getElementById(
-        "overlay"
-    );
+    div.className = "cell";
 
-    overlay.classList.add(
-        "show"
-    );
+    div.dataset.index = index;
 
-    clearTimeout(
-        overlayTimer
-    );
+    const iframe =
+    document.createElement("iframe");
 
-    overlayTimer =
-    setTimeout(()=>{
+    iframe.src =
+    buildEmbed(item.videoId);
 
-        overlay.classList.remove(
-            "show"
-        );
+    iframe.allow =
+    "autoplay; encrypted-media";
 
-    },2500);
+    iframe.allowFullscreen = true;
+
+    div.appendChild(iframe);
+
+    return div;
+
 }
 
-document.addEventListener(
-    "touchstart",
-    showOverlay,
-    {passive:true}
-);
+/* =====================================================
+   RENDER
+===================================================== */
 
-document.addEventListener(
-    "click",
-    showOverlay
-);
-/* =====================================
-   MODAL LAYOUT
-===================================== */
+function render(){
 
-function openLayoutModal(){
+    applyDefaultLayout(state.length);
 
-    document
-    .querySelector(
-        `input[value="${currentLayout}"]`
-    )
-    .checked = true;
+    state.forEach((item,index)=>{
 
-    showModal("layoutModal");
-}
+        const cell =
+        createCell(item,index);
 
-function closeLayoutModal(){
+        canvas.appendChild(cell);
 
-    hideModal("layoutModal");
-}
-
-function applyLayoutMode(){
-
-    let selected =
-    document.querySelector(
-        'input[name="layoutMode"]:checked'
-    );
-
-    if(!selected) return;
-
-    currentLayout =
-    selected.value;
-
-    saveLayout();
-
-    closeLayoutModal();
-
-    load();
-}
-
-/* =====================================
-   SWAP
-===================================== */
-
-function openSwap(){
-
-    let list =
-    document.getElementById(
-        "swapList"
-    );
-
-    list.innerHTML = "";
-
-    swapSelected = [];
-
-    videos.forEach((v,i)=>{
-
-        let item =
-        document.createElement("div");
-
-        item.className = "item";
-
-        item.innerHTML = `
-            <span>Live ${i+1}</span>
-            <input
-                class="swapCheck"
-                type="checkbox">
-        `;
-
-        let check =
-        item.querySelector(
-            ".swapCheck"
-        );
-
-        check.addEventListener(
-            "change",
-            ()=>toggleSwap(
-                i,
-                check,
-                item
-            )
-        );
-
-        list.appendChild(item);
     });
 
-    document
-    .getElementById(
-        "swapBtn"
-    )
-    .disabled = true;
-
-    showModal("swapModal");
 }
 
-function closeSwap(){
+/* =====================================================
+   LOCAL STORAGE
+===================================================== */
 
-    hideModal("swapModal");
+function saveState(){
+
+    localStorage.setItem(
+        "mosaicState",
+        JSON.stringify(state)
+    );
+
 }
 
-function toggleSwap(
+/* =====================================================
+   MODAL TROCAR
+===================================================== */
+
+function openSwapModal(){
+
+    overlay.style.display = "none";
+
+    swapSelection = [];
+
+    buildSwapList();
+
+    swapModal.style.display = "flex";
+
+    history.pushState(
+        { modal:"swap" },
+        ""
+    );
+
+}
+
+function closeSwapModal(){
+
+    swapModal.style.display = "none";
+
+    swapSelection = [];
+
+}
+
+function buildSwapList(){
+
+    swapList.innerHTML = "";
+
+    state.forEach((item,index)=>{
+
+        const row =
+        document.createElement("div");
+
+        row.className = "live-item";
+
+        const checkbox =
+        document.createElement("input");
+
+        checkbox.type = "checkbox";
+
+        checkbox.addEventListener(
+            "change",
+            ()=>{
+
+                if(checkbox.checked){
+
+                    if(
+                        swapSelection.length >= 2
+                    ){
+                        checkbox.checked = false;
+                        return;
+                    }
+
+                    swapSelection.push(index);
+
+                }else{
+
+                    swapSelection =
+                    swapSelection.filter(
+                        i => i !== index
+                    );
+
+                }
+
+                swapConfirmBtn.disabled =
+                swapSelection.length !== 2;
+
+            }
+        );
+
+        const label =
+        document.createElement("div");
+
+        label.className =
+        "live-label";
+
+        label.textContent =
+        `Live ${index + 1}`;
+
+        row.appendChild(checkbox);
+
+        row.appendChild(label);
+
+        swapList.appendChild(row);
+
+    });
+
+   }
+   /* =====================================================
+   CONFIRMAR TROCA
+===================================================== */
+
+swapConfirmBtn.addEventListener(
+    "click",
+    ()=>{
+
+        if(
+            swapSelection.length !== 2
+        ){
+            return;
+        }
+
+        const a =
+        swapSelection[0];
+
+        const b =
+        swapSelection[1];
+
+        const temp =
+        state[a];
+
+        state[a] =
+        state[b];
+
+        state[b] =
+        temp;
+
+        saveState();
+
+        render();
+
+        closeSwapModal();
+
+        showToast(
+            "Posições trocadas"
+        );
+
+    }
+);
+
+/* =====================================================
+   MODAL SUBSTITUIR
+===================================================== */
+
+function openReplaceModal(){
+
+    overlay.style.display = "none";
+
+    replaceSelection = null;
+
+    replaceUrl.value = "";
+
+    buildReplaceList();
+
+    replaceModal.style.display =
+    "flex";
+
+    history.pushState(
+        { modal:"replace" },
+        ""
+    );
+
+}
+
+function closeReplaceModal(){
+
+    replaceModal.style.display =
+    "none";
+
+    replaceSelection = null;
+
+    replaceUrl.value = "";
+
+}
+
+function buildReplaceList(){
+
+    replaceList.innerHTML = "";
+
+    state.forEach((item,index)=>{
+
+        const row =
+        document.createElement("div");
+
+        row.className =
+        "live-item";
+
+        const radio =
+        document.createElement("input");
+
+        radio.type = "radio";
+
+        radio.name =
+        "replaceRadio";
+
+        radio.addEventListener(
+            "change",
+            ()=>{
+
+                replaceSelection =
+                index;
+
+            }
+        );
+
+        const label =
+        document.createElement("div");
+
+        label.className =
+        "live-label";
+
+        label.textContent =
+        `Live ${index + 1}`;
+
+        row.appendChild(radio);
+
+        row.appendChild(label);
+
+        replaceList.appendChild(row);
+
+    });
+
+}
+
+/* =====================================================
+   SUBSTITUIÇÃO
+===================================================== */
+
+replaceConfirmBtn.addEventListener(
+    "click",
+    ()=>{
+
+        if(
+            replaceSelection === null
+        ){
+            showToast(
+                "Escolha uma live"
+            );
+            return;
+        }
+
+        const url =
+        replaceUrl.value.trim();
+
+        if(!url){
+
+            showToast(
+                "Cole uma URL"
+            );
+
+            return;
+        }
+
+        const match =
+        url.match(
+            /([a-zA-Z0-9_-]{11})/
+        );
+
+        if(!match){
+
+            showToast(
+                "URL inválida"
+            );
+
+            return;
+        }
+
+        const videoId =
+        match[1];
+
+        state[
+            replaceSelection
+        ].videoId = videoId;
+
+        saveState();
+
+        render();
+
+        closeReplaceModal();
+
+        showToast(
+            "Live substituída"
+        );
+
+    }
+);
+
+/* =====================================================
+   ATUALIZAÇÃO INDIVIDUAL
+===================================================== */
+
+function updateCell(
     index,
-    checkbox,
-    item
+    videoId
 ){
 
-    if(checkbox.checked){
-
-        if(
-            swapSelected.length >= 2
-        ){
-
-            let old =
-            swapSelected.shift();
-
-            let checks =
-            document.querySelectorAll(
-                ".swapCheck"
-            );
-
-            let items =
-            document.querySelectorAll(
-                "#swapList .item"
-            );
-
-            checks[old].checked =
-            false;
-
-            items[old]
-            .classList
-            .remove(
-                "selected"
-            );
-        }
-
-        swapSelected.push(index);
-
-        item.classList.add(
-            "selected"
-        );
-
-    }else{
-
-        swapSelected =
-        swapSelected.filter(
-            x => x !== index
-        );
-
-        item.classList.remove(
-            "selected"
-        );
-    }
-
-    document
-    .getElementById(
-        "swapBtn"
-    )
-    .disabled =
-    swapSelected.length !== 2;
-}
-
-function confirmSwap(){
-
-    if(
-        swapSelected.length !== 2
-    ) return;
-
-    let a =
-    swapSelected[0];
-
-    let b =
-    swapSelected[1];
-
-    [
-        videos[a],
-        videos[b]
-    ] =
-    [
-        videos[b],
-        videos[a]
-    ];
-
-    localStorage.setItem(
-        "videos",
-        JSON.stringify(videos)
+    const cell =
+    canvas.querySelector(
+        `[data-index="${index}"]`
     );
 
-    closeSwap();
-
-    load();
-}
-
-/* =====================================
-   REPLACE
-===================================== */
-
-function openReplace(){
-
-    let select =
-    document.getElementById(
-        "replaceSelect"
-    );
-
-    select.innerHTML = "";
-
-    videos.forEach((v,i)=>{
-
-        let option =
-        document.createElement(
-            "option"
-        );
-
-        option.value = i;
-
-        option.textContent =
-        "Live " + (i+1);
-
-        select.appendChild(
-            option
-        );
-    });
-
-    document
-    .getElementById(
-        "replaceInput"
-    )
-    .value = "";
-
-    showModal(
-        "replaceModal"
-    );
-}
-
-function closeReplace(){
-
-    hideModal(
-        "replaceModal"
-    );
-}
-
-function confirmReplace(){
-
-    let index =
-    Number(
-        document
-        .getElementById(
-            "replaceSelect"
-        )
-        .value
-    );
-
-    let url =
-    document
-    .getElementById(
-        "replaceInput"
-    )
-    .value
-    .trim();
-
-    if(!url) return;
-
-    videos[index] = url;
-
-    localStorage.setItem(
-        "videos",
-        JSON.stringify(videos)
-    );
-
-    closeReplace();
-
-    load();
-}
-
-/* =====================================
-   ROTATIVO
-===================================== */
-
-function startRotation(){
-
-    clearInterval(
-        rotateTimer
-    );
-
-    if(
-        currentLayout !==
-        "rotate"
-    ){
+    if(!cell){
         return;
     }
 
-    rotateTimer =
-    setInterval(()=>{
+    const iframe =
+    cell.querySelector("iframe");
 
-        featuredIndex++;
-
-        if(
-            featuredIndex >=
-            videos.length
-        ){
-            featuredIndex = 0;
-        }
-
-        load();
-
-    },180000);
-}
-
-/* =====================================
-   IFRAME
-===================================== */
-
-function createFrame(url){
-
-    let id =
-    extractID(url);
-
-    if(!id) return "";
-
-    return `
-    <iframe
-    src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
-    allow="autoplay; encrypted-media; fullscreen"
-    allowfullscreen>
-    </iframe>
-    `;
-}
-
-/* =====================================
-   LOAD
-===================================== */
-
-function load(){
-
-    clearInterval(
-        rotateTimer
-    );
-
-    let stage =
-    document.getElementById(
-        "stage"
-    );
-
-    stage.innerHTML = "";
-
-    stage.className = "";
-
-    let n =
-    Math.min(
-        videos.length,
-        6
-    );
-
-    if(n === 0){
+    if(!iframe){
         return;
     }
 
-    /* =====================
-       LAYOUT PADRÃO
-    ===================== */
+    iframe.src =
+    buildEmbed(videoId);
 
-    if(
-        currentLayout ===
-        "default"
-    ){
-
-        let cols =
-        n <= 2 ? 2 :
-        n <= 4 ? 2 : 3;
-
-        let rows =
-        n <= 2 ? 1 : 2;
-
-        stage.style.gridTemplateColumns =
-        `repeat(${cols},1fr)`;
-
-        stage.style.gridTemplateRows =
-        `repeat(${rows},1fr)`;
-
-        videos
-        .slice(0,6)
-        .forEach(url=>{
-
-            let tile =
-            document.createElement(
-                "div"
-            );
-
-            tile.className =
-            "tile";
-
-            tile.innerHTML =
-            createFrame(url);
-
-            stage.appendChild(
-                tile
-            );
-        });
-    }
-
-    /* =====================
-       LAYOUT DIREITA
-    ===================== */
-
-    else if(
-        currentLayout ===
-        "right"
-    ){
-
-        stage.className =
-        "layout-right";
-
-        stage.style.gridTemplateColumns =
-        "3fr 1fr";
-
-        stage.style.gridTemplateRows =
-        "repeat(3,1fr)";
-
-        let big =
-        document.createElement(
-            "div"
-        );
-
-        big.className =
-        "tile";
-
-        big.style.gridRow =
-        "1 / span 3";
-
-        big.innerHTML =
-        createFrame(
-            videos[0]
-        );
-
-        stage.appendChild(big);
-
-        for(
-            let i=1;
-            i<Math.min(n,4);
-            i++
-        ){
-
-            let tile =
-            document.createElement(
-                "div"
-            );
-
-            tile.className =
-            "tile";
-
-            tile.innerHTML =
-            createFrame(
-                videos[i]
-            );
-
-            stage.appendChild(
-                tile
-            );
-        }
-    }
-
-    /* =====================
-       LAYOUT DUPLO
-    ===================== */
-
-    else if(
-        currentLayout ===
-        "double"
-    ){
-
-        stage.className =
-        "layout-double";
-
-        stage.style.gridTemplateColumns =
-        "repeat(4,1fr)";
-
-        stage.style.gridTemplateRows =
-        "2fr 1fr";
-
-        let big1 =
-        document.createElement("div");
-
-        big1.className =
-        "tile";
-
-        big1.style.gridColumn =
-        "1 / span 2";
-
-        big1.innerHTML =
-        createFrame(
-            videos[0]
-        );
-
-        stage.appendChild(
-            big1
-        );
-
-        if(videos[1]){
-
-            let big2 =
-            document.createElement(
-                "div"
-            );
-
-            big2.className =
-            "tile";
-
-            big2.style.gridColumn =
-            "3 / span 2";
-
-            big2.innerHTML =
-            createFrame(
-                videos[1]
-            );
-
-            stage.appendChild(
-                big2
-            );
-        }
-
-        for(
-            let i=2;
-            i<n;
-            i++
-        ){
-
-            let tile =
-            document.createElement(
-                "div"
-            );
-
-            tile.className =
-            "tile";
-
-            tile.innerHTML =
-            createFrame(
-                videos[i]
-            );
-
-            stage.appendChild(
-                tile
-            );
-        }
-            }/* =====================
-       LAYOUT ROTATIVO
-    ===================== */
-
-    else if(
-        currentLayout ===
-        "rotate"
-    ){
-
-        stage.className =
-        "layout-rotate";
-
-        stage.style.gridTemplateColumns =
-        "3fr 1fr";
-
-        stage.style.gridTemplateRows =
-        "1fr";
-
-        let mainVideo =
-        videos[
-            featuredIndex %
-            videos.length
-        ];
-
-        let sideVideos =
-        videos.filter(
-            (v,i)=>
-            i !== (
-                featuredIndex %
-                videos.length
-            )
-        );
-
-        let big =
-        document.createElement(
-            "div"
-        );
-
-        big.className =
-        "tile";
-
-        big.innerHTML =
-        createFrame(
-            mainVideo
-        );
-
-        stage.appendChild(
-            big
-        );
-
-        let side =
-        document.createElement(
-            "div"
-        );
-
-        side.style.display =
-        "grid";
-
-        side.style.gridTemplateRows =
-        `repeat(${Math.max(sideVideos.length,1)},1fr)`;
-
-        side.style.gap =
-        "2px";
-
-        sideVideos.forEach(url=>{
-
-            let tile =
-            document.createElement(
-                "div"
-            );
-
-            tile.className =
-            "tile";
-
-            tile.innerHTML =
-            createFrame(url);
-
-            side.appendChild(
-                tile
-            );
-        });
-
-        stage.appendChild(
-            side
-        );
-
-        startRotation();
-    }
 }
 
-/* =====================================
-   FECHAR MODAIS AO TOCAR FORA
-===================================== */
+/* =====================================================
+   UPDATE GERAL
+===================================================== */
 
-document
-.querySelectorAll(".modal")
-.forEach(modal=>{
+async function forceUpdate(){
 
-    modal.addEventListener(
-        "click",
-        e=>{
+    try{
 
-            if(
-                e.target === modal
-            ){
+        showToast(
+            "Atualizando canais..."
+        );
 
-                modal.style.display =
-                "none";
+        const response =
+        await fetch(
+            `${WORKER_URL}?channels=${selectedChannels.join(",")}`
+        );
 
-                modalOpened =
-                false;
+        const data =
+        await response.json();
+
+        let updated = 0;
+
+        state.forEach(
+            (item,index)=>{
+
+                const newId =
+                data[item.channel];
+
+                if(
+                    newId &&
+                    newId !== item.videoId
+                ){
+
+                    item.videoId =
+                    newId;
+
+                    updateCell(
+                        index,
+                        newId
+                    );
+
+                    updated++;
+
+                }
+
             }
-        }
-    );
-});
+        );
 
-/* =====================================
-   VOLTA OVERLAY AO FECHAR MODAL
-===================================== */
+        saveState();
 
-const oldHideModal =
-hideModal;
+        if(updated){
 
-hideModal =
-function(id){
-
-    oldHideModal(id);
-
-    setTimeout(
-        showOverlay,
-        200
-    );
-};
-
-/* =====================================
-   REDIMENSIONAMENTO
-===================================== */
-
-window.addEventListener(
-    "resize",
-    ()=>{
-        load();
-    }
-);
-
-/* =====================================
-   VISIBILIDADE
-===================================== */
-
-document.addEventListener(
-    "visibilitychange",
-    ()=>{
-
-        if(
-            document.hidden
-        ){
-
-            clearInterval(
-                rotateTimer
+            showToast(
+                `${updated} canal(is) atualizado(s)`
             );
 
         }else{
 
-            if(
-                currentLayout ===
-                "rotate"
-            ){
+            showToast(
+                "Nenhuma mudança encontrada"
+            );
 
-                startRotation();
-            }
         }
+
+    }
+    catch(error){
+
+        console.error(error);
+
+        showToast(
+            "Erro ao atualizar"
+        );
+
+    }
+
+}
+
+/* =====================================================
+   LAYOUTS
+===================================================== */
+
+function cycleLayout(){
+
+    currentLayout++;
+
+    if(currentLayout > 3){
+        currentLayout = 0;
+    }
+
+    render();
+
+    const names = [
+        "Layout padrão",
+        "Layout lateral",
+        "Layout duplo",
+        "Layout rotativo"
+    ];
+
+    showToast(
+        names[currentLayout]
+    );
+
+    }
+   /* =====================================================
+   OVERLAY
+===================================================== */
+
+function showOverlay(){
+
+    if(
+        swapModal.style.display === "flex" ||
+        replaceModal.style.display === "flex"
+    ){
+        return;
+    }
+
+    overlay.style.display = "flex";
+
+    clearTimeout(overlayTimer);
+
+    overlayTimer = setTimeout(()=>{
+
+        overlay.style.display = "none";
+
+    },2500);
+
+}
+
+/* =====================================================
+   FECHAR OVERLAY
+===================================================== */
+
+function closeOverlay(){
+
+    overlay.style.display = "none";
+
+}
+
+/* =====================================================
+   CLIQUE NA TELA
+===================================================== */
+
+document.addEventListener(
+    "click",
+    (e)=>{
+
+        if(
+            e.target.closest(".overlay-btn")
+        ){
+            return;
+        }
+
+        if(
+            e.target.closest(".modal")
+        ){
+            return;
+        }
+
+        if(
+            e.target === backBtn
+        ){
+            return;
+        }
+
+        showOverlay();
+
     }
 );
 
-/* =====================================
+/* =====================================================
+   BOTÃO VOLTAR
+===================================================== */
+
+function handleBack(){
+
+    if(
+        swapModal.style.display === "flex"
+    ){
+
+        closeSwapModal();
+        return;
+
+    }
+
+    if(
+        replaceModal.style.display === "flex"
+    ){
+
+        closeReplaceModal();
+        return;
+
+    }
+
+    if(
+        overlay.style.display === "flex"
+    ){
+
+        closeOverlay();
+        return;
+
+    }
+
+    window.location.href =
+    "index.html";
+
+}
+
+backBtn.addEventListener(
+    "click",
+    handleBack
+);
+
+/* =====================================================
+   BOTÃO VOLTAR ANDROID
+===================================================== */
+
+history.pushState(
+    { page:"mosaic" },
+    ""
+);
+
+window.addEventListener(
+    "popstate",
+    ()=>{
+
+        handleBack();
+
+        history.pushState(
+            { page:"mosaic" },
+            ""
+        );
+
+    }
+);
+
+/* =====================================================
+   CARREGAMENTO
+===================================================== */
+
+async function init(){
+
+    try{
+
+        const response =
+        await fetch(
+            `${WORKER_URL}?channels=${selectedChannels.join(",")}`
+        );
+
+        const data =
+        await response.json();
+
+        state =
+        Object.keys(data)
+        .filter(
+            channel => data[channel]
+        )
+        .map(channel => ({
+
+            channel,
+
+            videoId:
+            data[channel]
+
+        }));
+
+        saveState();
+
+        render();
+
+        showToast(
+            "Canais carregados"
+        );
+
+    }
+    catch(error){
+
+        console.error(error);
+
+        showToast(
+            "Erro ao carregar"
+        );
+
+    }
+
+}
+
+/* =====================================================
+   LIMPEZA DE ESTADO ANTIGO
+===================================================== */
+
+/*
+IMPORTANTE
+
+NO INDEX.HTML
+
+ANTES DE:
+
+window.location.href = "mosaic.html";
+
+ADICIONE:
+
+localStorage.removeItem(
+    "mosaicState"
+);
+
+SENÃO O MOSAICO SEMPRE
+REABRIRÁ COM A SELEÇÃO ANTIGA.
+*/
+
+/* =====================================================
    START
-===================================== */
+===================================================== */
 
-showOverlay();
+init();
 
-load();
+/* 5 MINUTOS */
+
+setInterval(
+    forceUpdate,
+    300000
+);
 
 </script>
 
