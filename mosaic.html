@@ -108,6 +108,7 @@ const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
 let state = []; // [{channel, videoId}]
 let selectedCells = [];
 let overlayTimer = null;
+let mode = null; // "swap" | "replace"
 
 /* ---------------- GRID ---------------- */
 
@@ -149,7 +150,23 @@ function updateCell(index, videoId) {
 
 /* ---------------- SELECTION ---------------- */
 
+
 function toggleSelect(cell, index) {
+  // MODO SWAP
+  if (mode === "swap") {
+    handleSwapSelection(cell, index);
+    return;
+  }
+
+  // MODO REPLACE
+  if (mode === "replace") {
+    selectedCells = [index];
+    replaceSelected();
+    mode = null;
+    return;
+  }
+
+  // fallback visual (modo normal)
   if (selectedCells.includes(index)) {
     selectedCells = selectedCells.filter(i => i !== index);
     cell.style.outline = "none";
@@ -198,7 +215,21 @@ function swapSelected() {
 
   selectedCells = [];
 }
+function handleSwapSelection(cell, index) {
+  if (selectedCells.includes(index)) {
+    selectedCells = selectedCells.filter(i => i !== index);
+    cell.style.outline = "none";
+    return;
+  }
 
+  selectedCells.push(index);
+  cell.style.outline = "2px solid lime";
+
+  if (selectedCells.length === 2) {
+    swapSelected();
+    mode = null;
+  }
+}
 /* ---------------- REPLACE ---------------- */
 
 function replaceSelected() {
@@ -243,15 +274,16 @@ async function forceUpdate() {
   const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);
   const data = await res.json();
 
-  Object.keys(data).forEach((ch, i) => {
-    if (state[i]) {
-      state[i].videoId = data[ch];
-      updateCell(i, data[ch]);
+  state.forEach((item, i) => {
+    const newId = data[item.channel];
+
+    if (newId && newId !== item.videoId) {
+      item.videoId = newId;
+      updateCell(i, newId);
     }
   });
 
   saveState();
-
   status.textContent = "AO VIVO";
 }
 
@@ -295,12 +327,26 @@ function showOverlay() {
   }, 2500);
 }
 
-document.body.addEventListener("click", showOverlay);
+document.body.addEventListener("click", (e) => {
+  if (e.target.closest("iframe")) return;
+  if (e.target.classList.contains("btn")) return;
+  if (mode) return; // evita overlay durante operação
+
+  showOverlay();
+});
 
 /* ---------------- ACTION HOOKS ---------------- */
+function swapMode() {
+  mode = "swap";
+  status.textContent = "Modo swap: selecione 2 telas";
+}
 
-window.swapMode = swapSelected;
-window.replaceMode = replaceSelected;
+function replaceMode() {
+  mode = "replace";
+  status.textContent = "Modo replace: selecione 1 tela";
+}
+window.swapMode = swapMode;
+window.replaceMode = replaceMode;
 window.cycleLayout = cycleLayout;
 window.forceUpdate = forceUpdate;
 
