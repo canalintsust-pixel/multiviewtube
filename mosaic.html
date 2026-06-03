@@ -101,6 +101,11 @@ const canvas = document.getElementById("canvas");
 const status = document.getElementById("status");
 
 const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
+	let overlay = null;
+
+window.addEventListener("DOMContentLoaded", () => {
+  overlay = document.getElementById("overlay");
+});
 
 const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
 
@@ -238,6 +243,8 @@ let overlayTimer = null;
    MOSTRAR OVERLAY
 -------------------------- */
 function showOverlay() {
+  if (!overlay) return;
+
   overlay.style.display = "flex";
 
   clearTimeout(overlayTimer);
@@ -246,24 +253,31 @@ function showOverlay() {
     hideOverlay();
   }, 2500);
 }
-
 /* -------------------------
    OCULTAR OVERLAY
 -------------------------- */
 function hideOverlay() {
+  if (!overlay) return;
   overlay.style.display = "none";
 }
-
 /* -------------------------
    TOQUE NA TELA → OVERLAY
 -------------------------- */
 document.addEventListener("click", (e) => {
-  // evita clique dentro dos botões do overlay resetar loop
+  if (!overlay) return;
+
+  const overlayVisible = overlay.style.display === "flex";
+
+  // ignora clique dentro do overlay
   if (e.target.closest("#overlayPanel")) return;
 
-  showOverlay();
-});
-</script>
+  // se clicou dentro de iframe/cell, ainda assim pode abrir overlay
+  const clickedCanvas = e.target.closest("#canvas");
+
+  if (clickedCanvas && !overlayVisible) {
+    showOverlay();
+  }
+});</script>
 
 </body>
 </html>
