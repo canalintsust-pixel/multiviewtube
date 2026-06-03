@@ -10,7 +10,6 @@
       margin: 0;
       height: 100%;
       background: black;
-      gap: 2px;
       overflow: hidden;
     }
 
@@ -20,7 +19,7 @@
       align-items: center;
     }
 
-    /* Canvas 16:9 fixo */
+    /* CANVAS 16:9 FIXO */
     #canvas {
       position: relative;
       width: 100vw;
@@ -52,32 +51,34 @@
       font-size: 12px;
       z-index: 10;
     }
-          #overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.55);
-  display: none;
-  justify-content: center;
-  align-items: center;
-  z-index: 999;
-}
 
-#overlayPanel {
-  display: flex;
-  gap: 10px;
-  background: rgba(20,20,20,0.9);
-  padding: 14px;
-  border-radius: 10px;
-}
+    /* OVERLAY */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
 
-#overlayPanel button {
-  background: #222;
-  color: white;
-  border: 1px solid #333;
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-weight: bold;
-}
+    #overlayPanel {
+      display: flex;
+      gap: 10px;
+      background: rgba(20,20,20,0.95);
+      padding: 14px;
+      border-radius: 10px;
+    }
+
+    #overlayPanel button {
+      background: #222;
+      color: white;
+      border: 1px solid #333;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+    }
   </style>
 </head>
 
@@ -85,82 +86,74 @@
 
 <div id="canvas"></div>
 <div id="status">Carregando lives...</div>
+
 <div id="overlay">
   <div id="overlayPanel">
-
     <button onclick="alert('TROCAR (Passo 8)')">TROCAR</button>
     <button onclick="alert('SUBSTITUIR (Passo 8)')">SUBSTITUIR</button>
-    <button onclick="alert('LAYOUT (já existe no sistema)')">LAYOUT</button>
-    <button onclick="load()">ATUALIZAR TODAS</button>
-
+    <button onclick="alert('LAYOUT (Passo 8)')">LAYOUT</button>
+    <button onclick="forceReload()">ATUALIZAR TODAS</button>
   </div>
 </div>
-        
+
 <script>
 const canvas = document.getElementById("canvas");
 const status = document.getElementById("status");
+const overlayEl = document.getElementById("overlay");
 
 const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
-	let overlay = null;
-
-window.addEventListener("DOMContentLoaded", () => {
-  overlay = document.getElementById("overlay");
-});
-
 const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
 
-/* CACHE LOCAL (ESSENCIAL DO PASSO 6) */
-let currentState = {}; // { channel: videoId }
+let currentState = {};
+let overlayTimer = null;
 
 /* -------------------------
-   GRID ENGINE
+   INIT SAFE (WebView)
 -------------------------- */
+window.addEventListener("DOMContentLoaded", () => {
+  overlayEl.style.display = "none";
+});
 
+/* -------------------------
+   GRID
+-------------------------- */
 function setGrid(cols, rows) {
   canvas.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   canvas.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 }
 
 /* -------------------------
-   CREATE / UPDATE CELLS
+   EMBED YOUTUBE
 -------------------------- */
+function buildEmbed(videoId) {
+  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
+}
 
+/* -------------------------
+   CELLS
+-------------------------- */
 function createCell(channel, videoId) {
   const wrapper = document.createElement("div");
   wrapper.className = "cell";
   wrapper.dataset.channel = channel;
 
   const iframe = document.createElement("iframe");
-
   iframe.src = buildEmbed(videoId);
-
   iframe.allow = "autoplay; encrypted-media";
   iframe.allowFullscreen = true;
 
   wrapper.appendChild(iframe);
-
   return wrapper;
 }
 
 function updateCell(cell, videoId) {
   const iframe = cell.querySelector("iframe");
-  if (iframe) {
-    iframe.src = buildEmbed(videoId);
-  }
+  if (iframe) iframe.src = buildEmbed(videoId);
 }
 
 /* -------------------------
-   YOUTUBE EMBED (SEU PADRÃO)
+   LAYOUT
 -------------------------- */
-
-function buildEmbed(videoId) {
-  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
-}
-
-/* -------------------------
-   LAYOUT SIMPLES (fixo base)
--------------------------- */
-
 function applyLayout(n) {
   if (n === 1) setGrid(1,1);
   else if (n === 2) setGrid(2,1);
@@ -169,48 +162,41 @@ function applyLayout(n) {
 }
 
 /* -------------------------
-   RENDER INTELIGENTE
+   RENDER ROBUSTO
 -------------------------- */
-
 function render(data) {
   const channels = Object.keys(data);
+
   applyLayout(channels.length);
 
-  // primeira renderização
-  if (Object.keys(currentState).length === 0) {
+  // reset se mudou estrutura
+  if (canvas.children.length !== channels.length) {
     canvas.innerHTML = "";
-
-    channels.forEach(ch => {
-      const vid = data[ch];
-      currentState[ch] = vid;
-
-      const cell = createCell(ch, vid);
-      canvas.appendChild(cell);
-    });
-
-    return;
+    currentState = {};
   }
 
-  // atualização incremental
   channels.forEach(ch => {
-    const newVid = data[ch];
+    const vid = data[ch];
     const oldVid = currentState[ch];
 
-    const cell = canvas.querySelector(`[data-channel="${ch}"]`);
+    let cell = canvas.querySelector(`[data-channel="${ch}"]`);
 
-    if (!cell) return;
-
-    if (newVid && newVid !== oldVid) {
-      updateCell(cell, newVid);
-      currentState[ch] = newVid;
+    if (!cell) {
+      cell = createCell(ch, vid);
+      canvas.appendChild(cell);
     }
+
+    if (vid && vid !== oldVid) {
+      updateCell(cell, vid);
+    }
+
+    currentState[ch] = vid;
   });
 }
 
 /* -------------------------
-   FETCH WORKER
+   LOAD WORKER
 -------------------------- */
-
 async function load() {
   try {
     status.textContent = "Atualizando...";
@@ -229,23 +215,18 @@ async function load() {
 }
 
 /* -------------------------
-   INIT + AUTO UPDATE
+   FORCE RELOAD
 -------------------------- */
-
-load();
-setInterval(load, 60000);
-
-        const overlay = document.getElementById("overlay");
-
-let overlayTimer = null;
+function forceReload() {
+  currentState = {};
+  load();
+}
 
 /* -------------------------
-   MOSTRAR OVERLAY
+   OVERLAY CONTROL
 -------------------------- */
 function showOverlay() {
-  if (!overlay) return;
-
-  overlay.style.display = "flex";
+  overlayEl.style.display = "flex";
 
   clearTimeout(overlayTimer);
 
@@ -253,31 +234,33 @@ function showOverlay() {
     hideOverlay();
   }, 2500);
 }
-/* -------------------------
-   OCULTAR OVERLAY
--------------------------- */
+
 function hideOverlay() {
-  if (!overlay) return;
-  overlay.style.display = "none";
+  overlayEl.style.display = "none";
 }
+
 /* -------------------------
-   TOQUE NA TELA → OVERLAY
+   INPUT (WEBVIEW SAFE)
 -------------------------- */
-document.addEventListener("click", (e) => {
-  if (!overlay) return;
+document.addEventListener("pointerdown", (e) => {
+  const visible = overlayEl.style.display === "flex";
 
-  const overlayVisible = overlay.style.display === "flex";
-
-  // ignora clique dentro do overlay
   if (e.target.closest("#overlayPanel")) return;
 
-  // se clicou dentro de iframe/cell, ainda assim pode abrir overlay
-  const clickedCanvas = e.target.closest("#canvas");
+  const path = e.composedPath ? e.composedPath() : [];
+  if (path.some(el => el && el.tagName === "IFRAME")) return;
 
-  if (clickedCanvas && !overlayVisible) {
+  if (e.target.closest("#canvas") && !visible) {
     showOverlay();
   }
-});</script>
+});
+
+/* -------------------------
+   AUTO UPDATE
+-------------------------- */
+load();
+setInterval(load, 60000);
+</script>
 
 </body>
 </html>
