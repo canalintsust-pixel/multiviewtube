@@ -80,6 +80,55 @@
       font-size: 12px;
       z-index: 10;
     }
+    
+    /* ================= MODAIS ================= */
+
+.modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1500;
+}
+
+.modalBox {
+  background: #111;
+  padding: 20px;
+  border-radius: 10px;
+  width: 300px;
+  color: white;
+  font-family: Arial;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.modalHeader button {
+  background: transparent;
+  color: white;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+#swapList div,
+#replaceList div {
+  padding: 8px;
+  margin: 4px 0;
+  background: #222;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+#swapList div.selected,
+#replaceList div.selected {
+  outline: 2px solid lime;
+}
   </style>
 </head>
 
@@ -89,10 +138,39 @@
 <div id="status">Carregando...</div>
 
 <div id="overlay">
-  <div class="btn" onclick="swapMode()">TROCAR</div>
-  <div class="btn" onclick="replaceMode()">SUBSTITUIR</div>
+  <div class="btn" onclick="openSwapModal()">TROCAR</div>
+<div class="btn" onclick="openReplaceModal()">SUBSTITUIR</div>
   <div class="btn" onclick="cycleLayout()">LAYOUT</div>
   <div class="btn" onclick="forceUpdate()">ATUALIZAR TODAS</div>
+</div>
+
+<!-- ================= MODAL SWAP ================= -->
+<div id="swapModal" class="modal">
+  <div class="modalBox">
+    <div class="modalHeader">
+      <span>TROCAR POSIÇÕES</span>
+      <button onclick="closeSwapModal()">X</button>
+    </div>
+
+    <div id="swapList"></div>
+
+    <button onclick="confirmSwap()">TROCAR POSIÇÃO</button>
+  </div>
+</div>
+
+<!-- ================= MODAL REPLACE ================= -->
+<div id="replaceModal" class="modal">
+  <div class="modalBox">
+    <div class="modalHeader">
+      <span>SUBSTITUIR LIVE</span>
+      <button onclick="closeReplaceModal()">X</button>
+    </div>
+
+    <div id="replaceList"></div>
+
+    <input id="newUrl" placeholder="Cole nova URL" />
+    <button onclick="confirmReplace()">SUBSTITUIR</button>
+  </div>
 </div>
 
 <script>
@@ -107,8 +185,8 @@ const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
 
 let state = []; // [{channel, videoId}]
 let selectedCells = [];
-let overlayTimer = null;
 let mode = null; // "swap" | "replace"
+let overlayTimer = null;
 
 /* ---------------- GRID ---------------- */
 
@@ -197,6 +275,121 @@ function render() {
     const cell = createCell(item, i);
     canvas.appendChild(cell);
   });
+}
+
+/* ================= MODAIS ================= */
+
+const swapModal = document.getElementById("swapModal");
+const replaceModal = document.getElementById("replaceModal");
+
+let swapSelection = [];
+
+function openSwapModal() {
+  selectedCells = [];
+  swapSelection = [];
+
+  mode = "swap";
+
+  swapModal.style.display = "flex";
+
+  const list = document.getElementById("swapList");
+  list.innerHTML = "";
+
+  state.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.textContent = item.channel;
+
+    div.onclick = () => {
+      if (swapSelection.includes(i)) {
+        swapSelection = swapSelection.filter(x => x !== i);
+        div.classList.remove("selected");
+      } else {
+        if (swapSelection.length >= 2) return;
+        swapSelection.push(i);
+        div.classList.add("selected");
+      }
+    };
+
+    list.appendChild(div);
+  });
+}
+
+function closeSwapModal() {
+  swapModal.style.display = "none";
+  swapSelection = [];
+}
+
+function confirmSwap() {
+  if (swapSelection.length !== 2) {
+  alert("Selecione exatamente 2 canais");
+  return;
+}
+
+  const [a, b] = swapSelection;
+
+  const temp = state[a];
+  state[a] = state[b];
+  state[b] = temp;
+
+  saveState();
+  render();
+
+  closeSwapModal();
+
+  mode = null;
+}
+
+/* -------- REPLACE MODAL -------- */
+
+let replaceIndex = null;
+
+function openReplaceModal() {
+  selectedCells = [];
+  replaceIndex = null;
+
+  mode = "replace";
+
+  replaceModal.style.display = "flex";
+  
+  const list = document.getElementById("replaceList");
+  list.innerHTML = "";
+
+  state.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.textContent = item.channel;
+
+    div.onclick = () => {
+      replaceIndex = i;
+
+      [...list.children].forEach(c => c.classList.remove("selected"));
+      div.classList.add("selected");
+    };
+
+    list.appendChild(div);
+  });
+}
+
+function closeReplaceModal() {
+  replaceModal.style.display = "none";
+  replaceIndex = null;
+}
+
+function confirmReplace() {
+  const url = document.getElementById("newUrl").value;
+
+  if (!url || replaceIndex === null) return;
+
+  const match = url.match(/([a-zA-Z0-9_-]{11})/);
+  if (!match) return;
+
+  state[replaceIndex].videoId = match[1];
+
+  saveState();
+  updateCell(replaceIndex, match[1]);
+
+  closeReplaceModal();
+
+  mode = null;
 }
 
 /* ---------------- SWAP ---------------- */
@@ -328,25 +521,19 @@ function showOverlay() {
 }
 
 document.body.addEventListener("click", (e) => {
+  if (e.target.closest(".modal")) return;
   if (e.target.closest("iframe")) return;
   if (e.target.classList.contains("btn")) return;
-  if (mode) return; // evita overlay durante operação
+
+  if (mode) return;
 
   showOverlay();
 });
 
 /* ---------------- ACTION HOOKS ---------------- */
-function swapMode() {
-  mode = "swap";
-  status.textContent = "Modo swap: selecione 2 telas";
-}
 
-function replaceMode() {
-  mode = "replace";
-  status.textContent = "Modo replace: selecione 1 tela";
-}
-window.swapMode = swapMode;
-window.replaceMode = replaceMode;
+window.openSwapModal = openSwapModal;
+window.openReplaceModal = openReplaceModal;
 window.cycleLayout = cycleLayout;
 window.forceUpdate = forceUpdate;
 
