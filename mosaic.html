@@ -65,13 +65,13 @@ const status = document.getElementById("status");
 
 const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
 
-// 👉 SEU WORKER AQUI
 const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
 
-let liveData = {};
+/* CACHE LOCAL (ESSENCIAL DO PASSO 6) */
+let currentState = {}; // { channel: videoId }
 
 /* -------------------------
-   GRID ENGINE (mesmo do passo 3)
+   GRID ENGINE
 -------------------------- */
 
 function setGrid(cols, rows) {
@@ -79,81 +79,89 @@ function setGrid(cols, rows) {
   canvas.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 }
 
-function clear() {
-  canvas.innerHTML = "";
-}
-
-function cell(content) {
-  const div = document.createElement("div");
-  div.className = "cell";
-  div.appendChild(content);
-  return div;
-}
-
 /* -------------------------
-   YOUTUBE EMBED
+   CREATE / UPDATE CELLS
 -------------------------- */
 
-function createIframe(videoId) {
+function createCell(channel, videoId) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "cell";
+  wrapper.dataset.channel = channel;
+
   const iframe = document.createElement("iframe");
-  iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0`;
+
+  iframe.src = buildEmbed(videoId);
+
   iframe.allow = "autoplay; encrypted-media";
   iframe.allowFullscreen = true;
-  return iframe;
+
+  wrapper.appendChild(iframe);
+
+  return wrapper;
+}
+
+function updateCell(cell, videoId) {
+  const iframe = cell.querySelector("iframe");
+  if (iframe) {
+    iframe.src = buildEmbed(videoId);
+  }
 }
 
 /* -------------------------
-   LAYOUT ENGINE SIMPLES
+   YOUTUBE EMBED (SEU PADRÃO)
 -------------------------- */
 
-function renderLayout(videos) {
-  clear();
+function buildEmbed(videoId) {
+  return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
+}
 
-  const keys = Object.keys(videos);
-  const n = keys.length;
+/* -------------------------
+   LAYOUT SIMPLES (fixo base)
+-------------------------- */
 
-  if (n === 0) {
-    status.textContent = "Nenhuma live ativa";
+function applyLayout(n) {
+  if (n === 1) setGrid(1,1);
+  else if (n === 2) setGrid(2,1);
+  else if (n <= 4) setGrid(2,2);
+  else setGrid(3,2);
+}
+
+/* -------------------------
+   RENDER INTELIGENTE
+-------------------------- */
+
+function render(data) {
+  const channels = Object.keys(data);
+  applyLayout(channels.length);
+
+  // primeira renderização
+  if (Object.keys(currentState).length === 0) {
+    canvas.innerHTML = "";
+
+    channels.forEach(ch => {
+      const vid = data[ch];
+      currentState[ch] = vid;
+
+      const cell = createCell(ch, vid);
+      canvas.appendChild(cell);
+    });
+
     return;
   }
 
-  status.textContent = "Lives ativas: " + n;
+  // atualização incremental
+  channels.forEach(ch => {
+    const newVid = data[ch];
+    const oldVid = currentState[ch];
 
-  // 1
-  if (n === 1) setGrid(1, 1);
+    const cell = canvas.querySelector(`[data-channel="${ch}"]`);
 
-  // 2
-  else if (n === 2) setGrid(2, 1);
+    if (!cell) return;
 
-  // 3
-  else if (n === 3) setGrid(2, 2);
-
-  // 4
-  else if (n === 4) setGrid(2, 2);
-
-  // 5
-  else if (n === 5) setGrid(3, 2);
-
-  // 6
-  else setGrid(3, 2);
-
-  keys.slice(0, 6).forEach((ch) => {
-    const videoId = videos[ch];
-
-    const iframe = videoId
-      ? createIframe(videoId)
-      : (() => {
-          const div = document.createElement("div");
-          div.style.color = "#666";
-          div.style.display = "flex";
-          div.style.alignItems = "center";
-          div.style.justifyContent = "center";
-          div.style.height = "100%";
-          div.innerText = "Offline";
-          return div;
-        })();
-
-    canvas.appendChild(cell(iframe));
+    if (newVid && newVid !== oldVid) {
+      updateCell(cell, newVid);
+      currentState[ch] = newVid;
+    }
   });
 }
 
@@ -161,33 +169,29 @@ function renderLayout(videos) {
    FETCH WORKER
 -------------------------- */
 
-async function loadLives() {
+async function load() {
   try {
-    status.textContent = "Atualizando lives...";
+    status.textContent = "Atualizando...";
 
-    const res = await fetch(
-      `${WORKER_URL}?channels=${selected.join(",")}`
-    );
-
+    const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);
     const data = await res.json();
-    liveData = data;
 
-    renderLayout(liveData);
+    render(data);
+
+    status.textContent = "OK - ao vivo";
 
   } catch (e) {
-    status.textContent = "Erro ao carregar Worker";
     console.error(e);
+    status.textContent = "Erro no Worker";
   }
 }
 
 /* -------------------------
-   INIT
+   INIT + AUTO UPDATE
 -------------------------- */
 
-loadLives();
-
-/* auto refresh (base do sistema futuro) */
-setInterval(loadLives, 60000);
+load();
+setInterval(load, 60000);
 </script>
 
 </body>
