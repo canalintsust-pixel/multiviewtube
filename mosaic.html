@@ -1,1281 +1,360 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>MultiViewTube</title>
-
-<style>
-
-html,
-body{
-    margin:0;
-    padding:0;
-    width:100%;
-    height:100%;
-    overflow:hidden;
-    background:#000;
-    font-family:Arial,Helvetica,sans-serif;
-}
-
-/* =====================================================
-   CANVAS 16:9 FIXO
-===================================================== */
-
-body{
-    display:flex;
-    justify-content:center;
-    align-items:center;
-}
-
-#canvas{
-    position:relative;
-
-    width:100vw;
-    height:56.25vw;
-
-    max-height:100vh;
-    max-width:177.777vh;
-
-    background:#000;
-
-    display:grid;
-
-    overflow:hidden;
-}
-
-/* =====================================================
-   CÉLULAS DOS VÍDEOS
-===================================================== */
-
-.cell{
-    position:relative;
-    overflow:hidden;
-    background:#000;
-}
-
-.cell.selected{
-    outline:4px solid #00ff66;
-    z-index:5;
-}
-
-iframe{
-    width:100%;
-    height:100%;
-    border:none;
-    background:#000;
-}
-
-/* =====================================================
-   OVERLAY PRINCIPAL
-===================================================== */
-
-#overlay{
-    position:fixed;
-    inset:0;
-
-    display:none;
-
-    justify-content:center;
-    align-items:center;
-
-    background:rgba(0,0,0,.55);
-
-    z-index:9000;
-}
-
-.overlay-box{
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-}
-
-.overlay-btn{
-    min-width:220px;
-
-    padding:14px;
-
-    border:none;
-
-    border-radius:8px;
-
-    background:#1f1f1f;
-
-    color:#fff;
-
-    font-size:16px;
-
-    cursor:pointer;
-}
-
-.overlay-btn:active{
-    transform:scale(.98);
-}
-
-/* =====================================================
-   MODAIS
-===================================================== */
-
-.modal-backdrop{
-    position:fixed;
-
-    inset:0;
-
-    display:none;
-
-    justify-content:center;
-    align-items:center;
-
-    background:rgba(0,0,0,.75);
-
-    z-index:9500;
-}
-
-.modal{
-    width:min(90vw,500px);
-
-    max-height:80vh;
-
-    overflow:auto;
-
-    background:#111;
-
-    color:white;
-
-    border-radius:10px;
-
-    padding:20px;
-
-    box-sizing:border-box;
-}
-
-.modal-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-
-    margin-bottom:15px;
-}
-
-.modal-title{
-    font-size:20px;
-    font-weight:bold;
-}
-
-.close-btn{
-    width:36px;
-    height:36px;
-
-    border:none;
-
-    border-radius:50%;
-
-    background:#333;
-
-    color:#fff;
-
-    cursor:pointer;
-
-    font-size:18px;
-}
-
-.close-btn:active{
-    transform:scale(.95);
-}
-
-/* =====================================================
-   LISTAS DOS MODAIS
-===================================================== */
-
-.live-item{
-    display:flex;
-    align-items:center;
-
-    gap:10px;
-
-    padding:10px;
-
-    border:1px solid #333;
-
-    border-radius:8px;
-
-    margin-bottom:8px;
-}
-
-.live-item input[type="checkbox"]{
-    width:22px;
-    height:22px;
-}
-
-.live-label{
-    flex:1;
-    font-size:15px;
-}
-
-/* =====================================================
-   INPUT URL
-===================================================== */
-
-.modal-input{
-    width:100%;
-
-    box-sizing:border-box;
-
-    padding:12px;
-
-    border:none;
-
-    border-radius:8px;
-
-    margin-top:10px;
-
-    margin-bottom:15px;
-}
-
-/* =====================================================
-   BOTÕES DOS MODAIS
-===================================================== */
-
-.action-btn{
-    width:100%;
-
-    padding:14px;
-
-    border:none;
-
-    border-radius:8px;
-
-    background:#0066ff;
-
-    color:white;
-
-    font-size:16px;
-
-    cursor:pointer;
-}
-
-.action-btn:disabled{
-    opacity:.4;
-    cursor:not-allowed;
-}
-
-/* =====================================================
-   TOAST TEMPORÁRIO
-===================================================== */
-
-#toast{
-    position:fixed;
-
-    left:50%;
-    bottom:30px;
-
-    transform:translateX(-50%);
-
-    background:rgba(20,20,20,.95);
-
-    color:#fff;
-
-    padding:12px 18px;
-
-    border-radius:8px;
-
-    display:none;
-
-    z-index:99999;
-}
-
-/* =====================================================
-   BOTÃO VOLTAR
-===================================================== */
-
-#backBtn{
-    position:fixed;
-
-    top:12px;
-    left:12px;
-
-    width:44px;
-    height:44px;
-
-    border:none;
-
-    border-radius:50%;
-
-    background:rgba(0,0,0,.7);
-
-    color:white;
-
-    font-size:22px;
-
-    z-index:9100;
-
-    cursor:pointer;
-}
-
-</style>
-</head>
-
-<body>
-
-<button id="backBtn">←</button>
-
-<div id="canvas"></div>
-
-<!-- OVERLAY -->
-
-<div id="overlay">
-
-    <div class="overlay-box">
-
-        <button class="overlay-btn" onclick="openSwapModal()">
-            TROCAR
-        </button>
-
-        <button class="overlay-btn" onclick="openReplaceModal()">
-            SUBSTITUIR
-        </button>
-
-        <button class="overlay-btn" onclick="cycleLayout()">
-            LAYOUT
-        </button>
-
-        <button class="overlay-btn" onclick="forceUpdate()">
-            ATUALIZAR TODAS
-        </button>
-
-    </div>
-
-</div>
-
-<!-- MODAL TROCAR -->
-
-<div id="swapModal" class="modal-backdrop">
-
-    <div class="modal">
-
-        <div class="modal-header">
-
-            <div class="modal-title">
-                Trocar posições
-            </div>
-
-            <button
-                class="close-btn"
-                onclick="closeSwapModal()">
-                X
-            </button>
-
-        </div>
-
-        <div id="swapList"></div>
-
-        <button
-            id="swapConfirmBtn"
-            class="action-btn"
-            disabled>
-
-            TROCAR POSIÇÃO
-
-        </button>
-
-    </div>
-
-</div>
-
-<!-- MODAL SUBSTITUIR -->
-
-<div id="replaceModal" class="modal-backdrop">
-
-    <div class="modal">
-
-        <div class="modal-header">
-
-            <div class="modal-title">
-                Substituir live
-            </div>
-
-            <button
-                class="close-btn"
-                onclick="closeReplaceModal()">
-                X
-            </button>
-
-        </div>
-
-        <div id="replaceList"></div>
-
-        <input
-            id="replaceUrl"
-            class="modal-input"
-            type="text"
-            placeholder="Cole URL do YouTube">
-
-        <button
-            id="replaceConfirmBtn"
-            class="action-btn">
-
-            SUBSTITUIR
-
-        </button>
-
-    </div>
-
-</div>
-
-<div id="toast"></div>
-
-<script>
-    /* =====================================================
-   ELEMENTOS
-===================================================== */
-
-const canvas = document.getElementById("canvas");
-
-const overlay = document.getElementById("overlay");
-
-const swapModal =
-document.getElementById("swapModal");
-
-const replaceModal =
-document.getElementById("replaceModal");
-
-const swapList =
-document.getElementById("swapList");
-
-const replaceList =
-document.getElementById("replaceList");
-
-const replaceUrl =
-document.getElementById("replaceUrl");
-
-const swapConfirmBtn =
-document.getElementById("swapConfirmBtn");
-
-const replaceConfirmBtn =
-document.getElementById("replaceConfirmBtn");
-
-const toast =
-document.getElementById("toast");
-
-const backBtn =
-document.getElementById("backBtn");
-
-/* =====================================================
-   CONFIG
-===================================================== */
-
-const WORKER_URL =
-"https://polished-smoke-6d50.canalintsust.workers.dev/";
-
-const selectedChannels =
-JSON.parse(
-localStorage.getItem("selectedChannels") || "[]"
-);
-
-/* =====================================================
-   ESTADO GLOBAL
-===================================================== */
-
-let state = [];
-
-let currentLayout = 0;
-
-let overlayTimer = null;
-
-let toastTimer = null;
-
-let swapSelection = [];
-
-let replaceSelection = null;
-
-/* =====================================================
-   TOAST
-===================================================== */
-
-function showToast(message){
-
-    toast.textContent = message;
-
-    toast.style.display = "block";
-
-    clearTimeout(toastTimer);
-
-    toastTimer = setTimeout(() => {
-
-        toast.style.display = "none";
-
-    },2000);
-
-}
-
-/* =====================================================
-   EMBED
-===================================================== */
-
-function buildEmbed(videoId){
-
-    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
-
-}
-
-/* =====================================================
-   GRID BÁSICO
-===================================================== */
-
-function setGrid(columns,rows){
-
-    canvas.style.gridTemplateColumns =
-    `repeat(${columns},1fr)`;
-
-    canvas.style.gridTemplateRows =
-    `repeat(${rows},1fr`;
-
-}
-
-/* =====================================================
-   LAYOUT PADRÃO
-===================================================== */
-
-function applyDefaultLayout(count){
-
-    canvas.innerHTML = "";
-
-    if(count === 1){
-
-        setGrid(1,1);
-
-    }
-
-    else if(count === 2){
-
-        setGrid(2,1);
-
-    }
-
-    else if(count === 3){
-
-        setGrid(2,2);
-
-    }
-
-    else if(count === 4){
-
-        setGrid(2,2);
-
-    }
-
-    else if(count === 5){
-
-        setGrid(3,2);
-
-    }
-
-    else{
-
-        setGrid(3,2);
-
-    }
-
-}
-
-/* =====================================================
-   CRIA CÉLULA
-===================================================== */
-
-function createCell(item,index){
-
-    const div =
-    document.createElement("div");
-
-    div.className = "cell";
-
-    div.dataset.index = index;
-
-    const iframe =
-    document.createElement("iframe");
-
-    iframe.src =
-    buildEmbed(item.videoId);
-
-    iframe.allow =
-    "autoplay; encrypted-media";
-
-    iframe.allowFullscreen = true;
-
-    div.appendChild(iframe);
-
-    return div;
-
-}
-
-/* =====================================================
-   RENDER
-===================================================== */
-
-function render(){
-
-    applyDefaultLayout(state.length);
-
-    state.forEach((item,index)=>{
-
-        const cell =
-        createCell(item,index);
-
-        canvas.appendChild(cell);
-
-    });
-
-}
-
-/* =====================================================
-   LOCAL STORAGE
-===================================================== */
-
-function saveState(){
-
-    localStorage.setItem(
-        "mosaicState",
-        JSON.stringify(state)
-    );
-
-}
-
-/* =====================================================
-   MODAL TROCAR
-===================================================== */
-
-function openSwapModal(){
-
-    overlay.style.display = "none";
-
-    swapSelection = [];
-
-    buildSwapList();
-
-    swapModal.style.display = "flex";
-
-    history.pushState(
-        { modal:"swap" },
-        ""
-    );
-
-}
-
-function closeSwapModal(){
-
-    swapModal.style.display = "none";
-
-    swapSelection = [];
-
-}
-
-function buildSwapList(){
-
-    swapList.innerHTML = "";
-
-    state.forEach((item,index)=>{
-
-        const row =
-        document.createElement("div");
-
-        row.className = "live-item";
-
-        const checkbox =
-        document.createElement("input");
-
-        checkbox.type = "checkbox";
-
-        checkbox.addEventListener(
-            "change",
-            ()=>{
-
-                if(checkbox.checked){
-
-                    if(
-                        swapSelection.length >= 2
-                    ){
-                        checkbox.checked = false;
-                        return;
-                    }
-
-                    swapSelection.push(index);
-
-                }else{
-
-                    swapSelection =
-                    swapSelection.filter(
-                        i => i !== index
-                    );
-
-                }
-
-                swapConfirmBtn.disabled =
-                swapSelection.length !== 2;
-
-            }
-        );
-
-        const label =
-        document.createElement("div");
-
-        label.className =
-        "live-label";
-
-        label.textContent =
-        `Live ${index + 1}`;
-
-        row.appendChild(checkbox);
-
-        row.appendChild(label);
-
-        swapList.appendChild(row);
-
-    });
-
-}
-    /* =====================================================
-   CONFIRMAR TROCA
-===================================================== */
-
-swapConfirmBtn.addEventListener(
-    "click",
-    ()=>{
-
-        if(
-            swapSelection.length !== 2
-        ){
-            return;
-        }
-
-        const a =
-        swapSelection[0];
-
-        const b =
-        swapSelection[1];
-
-        const temp =
-        state[a];
-
-        state[a] =
-        state[b];
-
-        state[b] =
-        temp;
-
-        saveState();
-
-        render();
-
-        closeSwapModal();
-
-        showToast(
-            "Posições trocadas"
-        );
-
-    }
-);
-
-/* =====================================================
-   MODAL SUBSTITUIR
-===================================================== */
-
-function openReplaceModal(){
-
-    overlay.style.display = "none";
-
-    replaceSelection = null;
-
-    replaceUrl.value = "";
-
-    buildReplaceList();
-
-    replaceModal.style.display =
-    "flex";
-
-    history.pushState(
-        { modal:"replace" },
-        ""
-    );
-
-}
-
-function closeReplaceModal(){
-
-    replaceModal.style.display =
-    "none";
-
-    replaceSelection = null;
-
-    replaceUrl.value = "";
-
-}
-
-function buildReplaceList(){
-
-    replaceList.innerHTML = "";
-
-    state.forEach((item,index)=>{
-
-        const row =
-        document.createElement("div");
-
-        row.className =
-        "live-item";
-
-        const radio =
-        document.createElement("input");
-
-        radio.type = "radio";
-
-        radio.name =
-        "replaceRadio";
-
-        radio.addEventListener(
-            "change",
-            ()=>{
-
-                replaceSelection =
-                index;
-
-            }
-        );
-
-        const label =
-        document.createElement("div");
-
-        label.className =
-        "live-label";
-
-        label.textContent =
-        `Live ${index + 1}`;
-
-        row.appendChild(radio);
-
-        row.appendChild(label);
-
-        replaceList.appendChild(row);
-
-    });
-
-}
-
-/* =====================================================
-   SUBSTITUIÇÃO
-===================================================== */
-
-replaceConfirmBtn.addEventListener(
-    "click",
-    ()=>{
-
-        if(
-            replaceSelection === null
-        ){
-            showToast(
-                "Escolha uma live"
-            );
-            return;
-        }
-
-        const url =
-        replaceUrl.value.trim();
-
-        if(!url){
-
-            showToast(
-                "Cole uma URL"
-            );
-
-            return;
-        }
-
-        const match =
-        url.match(
-            /([a-zA-Z0-9_-]{11})/
-        );
-
-        if(!match){
-
-            showToast(
-                "URL inválida"
-            );
-
-            return;
-        }
-
-        const videoId =
-        match[1];
-
-        state[
-            replaceSelection
-        ].videoId = videoId;
-
-        saveState();
-
-        render();
-
-        closeReplaceModal();
-
-        showToast(
-            "Live substituída"
-        );
-
-    }
-);
-
-/* =====================================================
-   ATUALIZAÇÃO INDIVIDUAL
-===================================================== */
-
-function updateCell(
-    index,
-    videoId
-){
-
-    const cell =
-    canvas.querySelector(
-        `[data-index="${index}"]`
-    );
-
-    if(!cell){
-        return;
-    }
-
-    const iframe =
-    cell.querySelector("iframe");
-
-    if(!iframe){
-        return;
-    }
-
-    iframe.src =
-    buildEmbed(videoId);
-
-}
-
-/* =====================================================
-   UPDATE GERAL
-===================================================== */
-
-async function forceUpdate(){
-
-    try{
-
-        showToast(
-            "Atualizando canais..."
-        );
-
-        const response =
-        await fetch(
-            `${WORKER_URL}?channels=${selectedChannels.join(",")}`
-        );
-
-        const data =
-        await response.json();
-
-        let updated = 0;
-
-        state.forEach(
-            (item,index)=>{
-
-                const newId =
-                data[item.channel];
-
-                if(
-                    newId &&
-                    newId !== item.videoId
-                ){
-
-                    item.videoId =
-                    newId;
-
-                    updateCell(
-                        index,
-                        newId
-                    );
-
-                    updated++;
-
-                }
-
-            }
-        );
-
-        saveState();
-
-        if(updated){
-
-            showToast(
-                `${updated} canal(is) atualizado(s)`
-            );
-
-        }else{
-
-            showToast(
-                "Nenhuma mudança encontrada"
-            );
-
-        }
-
-    }
-    catch(error){
-
-        console.error(error);
-
-        showToast(
-            "Erro ao atualizar"
-        );
-
-    }
-
-}
-
-/* =====================================================
-   LAYOUTS
-===================================================== */
-
-function cycleLayout(){
-
-    currentLayout++;
-
-    if(currentLayout > 3){
-        currentLayout = 0;
-    }
-
-    render();
-
-    const names = [
-        "Layout padrão",
-        "Layout lateral",
-        "Layout duplo",
-        "Layout rotativo"
-    ];
-
-    showToast(
-        names[currentLayout]
-    );
-
-        }
-    /* =====================================================
-   OVERLAY
-===================================================== */
-
-function showOverlay(){
-
-    if(
-        swapModal.style.display === "flex" ||
-        replaceModal.style.display === "flex"
-    ){
-        return;
-    }
-
-    overlay.style.display = "flex";
-
-    clearTimeout(overlayTimer);
-
-    overlayTimer = setTimeout(()=>{
-
-        overlay.style.display = "none";
-
-    },2500);
-
-}
-
-/* =====================================================
-   FECHAR OVERLAY
-===================================================== */
-
-function closeOverlay(){
-
-    overlay.style.display = "none";
-
-}
-
-/* =====================================================
-   CLIQUE NA TELA
-===================================================== */
-
-document.addEventListener(
-    "click",
-    (e)=>{
-
-        if(
-            e.target.closest(".overlay-btn")
-        ){
-            return;
-        }
-
-        if(
-            e.target.closest(".modal")
-        ){
-            return;
-        }
-
-        if(
-            e.target === backBtn
-        ){
-            return;
-        }
-
-        showOverlay();
-
-    }
-);
-
-/* =====================================================
-   BOTÃO VOLTAR
-===================================================== */
-
-function handleBack(){
-
-    if(
-        swapModal.style.display === "flex"
-    ){
-
-        closeSwapModal();
-        return;
-
-    }
-
-    if(
-        replaceModal.style.display === "flex"
-    ){
-
-        closeReplaceModal();
-        return;
-
-    }
-
-    if(
-        overlay.style.display === "flex"
-    ){
-
-        closeOverlay();
-        return;
-
-    }
-
-    window.location.href =
-    "index.html";
-
-}
-
-backBtn.addEventListener(
-    "click",
-    handleBack
-);
-
-/* =====================================================
-   BOTÃO VOLTAR ANDROID
-===================================================== */
-
-history.pushState(
-    { page:"mosaic" },
-    ""
-);
-
-window.addEventListener(
-    "popstate",
-    ()=>{
-
-        handleBack();
-
-        history.pushState(
-            { page:"mosaic" },
-            ""
-        );
-
-    }
-);
-
-/* =====================================================
-   CARREGAMENTO
-===================================================== */
-
-async function init(){
-
-    try{
-
-        const response =
-        await fetch(
-            `${WORKER_URL}?channels=${selectedChannels.join(",")}`
-        );
-
-        const data =
-        await response.json();
-
-        state =
-        Object.keys(data)
-        .filter(
-            channel => data[channel]
-        )
-        .map(channel => ({
-
-            channel,
-
-            videoId:
-            data[channel]
-
-        }));
-
-        saveState();
-
-        render();
-
-        showToast(
-            "Canais carregados"
-        );
-
-    }
-    catch(error){
-
-        console.error(error);
-
-        showToast(
-            "Erro ao carregar"
-        );
-
-    }
-
-}
-
-/* =====================================================
-   LIMPEZA DE ESTADO ANTIGO
-===================================================== */
-
-/*
-IMPORTANTE
-
-NO INDEX.HTML
-
-ANTES DE:
-
-window.location.href = "mosaic.html";
-
-ADICIONE:
-
-localStorage.removeItem(
-    "mosaicState"
-);
-
-SENÃO O MOSAICO SEMPRE
-REABRIRÁ COM A SELEÇÃO ANTIGA.
-*/
-
-/* =====================================================
-   START
-===================================================== */
-
-init();
-
-/* 5 MINUTOS */
-
-setInterval(
-    forceUpdate,
-    300000
-);
-
-</script>
-
-</body>
+<!DOCTYPE html>                            
+<html lang="pt-br">                            
+<head>                            
+  <meta charset="UTF-8" />                            
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>                            
+  <title>Mosaic Live</title>                            
+                            
+  <style>                            
+    html, body {                            
+      margin: 0;                            
+      height: 100%;                            
+      background: black;                            
+      overflow: hidden;                            
+    }                            
+                            
+    body {                            
+      display: flex;                            
+      justify-content: center;                            
+      align-items: center;                            
+    }                            
+                            
+    #canvas {                            
+      position: relative;                            
+      width: 100vw;                            
+      height: 56.25vw;                            
+      max-height: 100vh;                            
+      max-width: 177.78vh;                            
+      display: grid;                            
+      background: black;                            
+    }                            
+                            
+    .cell {                            
+      position: relative;                            
+      overflow: hidden;                            
+      background: black;                            
+    }                            
+                            
+    iframe {                            
+      width: 100%;                            
+      height: 100%;                            
+      border: 0;                            
+    }                            
+                            
+    /* ---------------- OVERLAY ---------------- */                            
+                            
+    #overlay {                            
+      position: absolute;                            
+      inset: 0;                            
+      background: rgba(0,0,0,0.65);                            
+      display: none;                            
+      flex-direction: column;                            
+      justify-content: center;                            
+      align-items: center;                            
+      gap: 12px;                            
+      z-index: 999;                            
+    }                            
+                            
+    .btn {                            
+      padding: 12px 18px;                            
+      background: #222;                            
+      color: white;                            
+      border: 1px solid #444;                            
+      border-radius: 8px;                            
+      font-family: Arial;                            
+      cursor: pointer;                            
+      min-width: 180px;                            
+      text-align: center;                            
+    }                            
+                            
+    .btn:hover {                            
+      background: #333;                            
+    }                            
+                            
+    #status {                            
+      position: absolute;                            
+      top: 10px;                            
+      left: 10px;                            
+      color: #aaa;                            
+      font-family: Arial;                            
+      font-size: 12px;                            
+      z-index: 10;                            
+    }                            
+  </style>                            
+</head>                            
+                            
+<body>                            
+                            
+<div id="canvas"></div>                            
+<div id="status">Carregando...</div>                            
+                            
+<div id="overlay">                            
+  <div class="btn" onclick="swapMode()">TROCAR</div>                            
+  <div class="btn" onclick="replaceMode()">SUBSTITUIR</div>                            
+  <div class="btn" onclick="cycleLayout()">LAYOUT</div>                            
+  <div class="btn" onclick="forceUpdate()">ATUALIZAR TODAS</div>                            
+</div>                            
+                            
+<script>                            
+const canvas = document.getElementById("canvas");                            
+const overlay = document.getElementById("overlay");                            
+const status = document.getElementById("status");                            
+                            
+const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";                            
+const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");                            
+                            
+/* ---------------- STATE ---------------- */                            
+                            
+let state = []; // [{channel, videoId}]                            
+let selectedCells = [];                            
+let overlayTimer = null;                            
+let mode = null; // "swap" | "replace"                            
+                            
+/* ---------------- GRID ---------------- */                            
+                            
+function setGrid(c, r) {                            
+  canvas.style.gridTemplateColumns = `repeat(${c}, 1fr)`;                            
+  canvas.style.gridTemplateRows = `repeat(${r}, 1fr)`;                            
+}                            
+                            
+/* ---------------- EMBED ---------------- */                            
+                            
+function buildEmbed(id) {                            
+  return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;                            
+}                            
+                            
+/* ---------------- CELL ---------------- */                            
+                            
+function createCell(item, index) {                            
+  const div = document.createElement("div");                            
+  div.className = "cell";                            
+  div.dataset.index = index;                            
+                            
+  const iframe = document.createElement("iframe");                            
+  iframe.src = buildEmbed(item.videoId);                            
+                            
+  div.appendChild(iframe);                            
+                            
+  div.onclick = () => toggleSelect(div, index);                            
+                            
+  return div;                            
+}                            
+                            
+function updateCell(index, videoId) {                            
+  const cell = canvas.querySelector(`[data-index="${index}"]`);                            
+  if (!cell) return;                            
+                            
+  const iframe = cell.querySelector("iframe");                            
+  iframe.src = buildEmbed(videoId);                            
+}                            
+                            
+/* ---------------- SELECTION ---------------- */                            
+                            
+                            
+function toggleSelect(cell, index) {                            
+  // MODO SWAP                            
+  if (mode === "swap") {                            
+    handleSwapSelection(cell, index);                            
+    return;                            
+  }                            
+                            
+  // MODO REPLACE                            
+  if (mode === "replace") {                            
+    selectedCells = [index];                            
+    replaceSelected();                            
+    mode = null;                            
+    return;                            
+  }                            
+                            
+  // fallback visual (modo normal)                            
+  if (selectedCells.includes(index)) {                            
+    selectedCells = selectedCells.filter(i => i !== index);                            
+    cell.style.outline = "none";                            
+  } else {                            
+    if (selectedCells.length >= 2) return;                            
+                            
+    selectedCells.push(index);                            
+    cell.style.outline = "2px solid lime";                            
+  }                            
+}                            
+                            
+/* ---------------- LAYOUT ---------------- */                            
+                            
+function applyLayout(n) {                            
+  if (n === 1) setGrid(1,1);                            
+  else if (n === 2) setGrid(2,1);                            
+  else if (n <= 4) setGrid(2,2);                            
+  else setGrid(3,2);                            
+}                            
+                            
+/* ---------------- RENDER ---------------- */                            
+                            
+function render() {                            
+  canvas.innerHTML = "";                            
+  applyLayout(state.length);                            
+                            
+  state.forEach((item, i) => {                            
+    const cell = createCell(item, i);                            
+    canvas.appendChild(cell);                            
+  });                            
+}                            
+                            
+/* ---------------- SWAP ---------------- */                            
+                            
+function swapSelected() {                            
+  if (selectedCells.length !== 2) return;                            
+                            
+  const [a, b] = selectedCells;                            
+                            
+  const temp = state[a];                            
+  state[a] = state[b];                            
+  state[b] = temp;                            
+                            
+  saveState();                            
+  render();                            
+                            
+  selectedCells = [];                            
+}                            
+function handleSwapSelection(cell, index) {                            
+  if (selectedCells.includes(index)) {                            
+    selectedCells = selectedCells.filter(i => i !== index);                            
+    cell.style.outline = "none";                            
+    return;                            
+  }                            
+                            
+  selectedCells.push(index);                            
+  cell.style.outline = "2px solid lime";                            
+                            
+  if (selectedCells.length === 2) {                            
+    swapSelected();                            
+    mode = null;                            
+  }                            
+}                            
+/* ---------------- REPLACE ---------------- */                            
+                            
+function replaceSelected() {                            
+  if (selectedCells.length !== 1) return;                            
+                            
+  const index = selectedCells[0];                            
+  const url = prompt("Cole nova URL do YouTube (@canal/live ou video)");                            
+                            
+  if (!url) return;                            
+                            
+  // extrai videoId simples                            
+  const match = url.match(/([a-zA-Z0-9_-]{11})/);                            
+                            
+  if (!match) return;                            
+                            
+  state[index].videoId = match[1];                            
+                            
+  saveState();                            
+  updateCell(index, match[1]);                            
+                            
+  selectedCells = [];                            
+}                            
+                            
+/* ---------------- LAYOUT CYCLE ---------------- */                            
+                            
+let layoutMode = 0;                            
+function cycleLayout() {                            
+  layoutMode = (layoutMode + 1) % 3;                            
+                            
+  const n = state.length;                            
+                            
+  if (layoutMode === 0) setGrid(1,1);                            
+  if (layoutMode === 1) setGrid(2,2);                            
+  if (layoutMode === 2) setGrid(3,2);                            
+}                            
+                            
+/* ---------------- UPDATE ALL ---------------- */                            
+                            
+async function forceUpdate() {                            
+  status.textContent = "Atualizando...";                            
+                            
+  const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);                            
+  const data = await res.json();                            
+                            
+  state.forEach((item, i) => {                            
+    const newId = data[item.channel];                            
+                            
+    if (newId && newId !== item.videoId) {                            
+      item.videoId = newId;                            
+      updateCell(i, newId);                            
+    }                            
+  });                            
+                            
+  saveState();                            
+  status.textContent = "AO VIVO";                            
+}                            
+                            
+/* ---------------- PERSIST ---------------- */                            
+                            
+function saveState() {                            
+  localStorage.setItem("mosaicState", JSON.stringify(state));                            
+}                            
+                            
+/* ---------------- LOAD ---------------- */                            
+                            
+async function init() {                            
+  const saved = localStorage.getItem("mosaicState");                            
+                            
+  if (saved) {                            
+    state = JSON.parse(saved);                            
+    render();                            
+    return;                            
+  }                            
+                            
+  const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);                            
+  const data = await res.json();                            
+                            
+  state = Object.keys(data).map(ch => ({                            
+    channel: ch,                            
+    videoId: data[ch]                            
+  }));                            
+                            
+  saveState();                            
+  render();                            
+}                            
+                            
+/* ---------------- OVERLAY ---------------- */                            
+                            
+function showOverlay() {                            
+  overlay.style.display = "flex";                            
+                            
+  clearTimeout(overlayTimer);                            
+  overlayTimer = setTimeout(() => {                            
+    overlay.style.display = "none";                            
+  }, 2500);                            
+}                            
+                            
+document.body.addEventListener("click", (e) => {                            
+  if (e.target.closest("iframe")) return;                            
+  if (e.target.classList.contains("btn")) return;                            
+  if (mode) return; // evita overlay durante operação                            
+                            
+  showOverlay();                            
+});                            
+                            
+/* ---------------- ACTION HOOKS ---------------- */                            
+function swapMode() {                            
+  mode = "swap";                            
+  status.textContent = "Modo swap: selecione 2 telas";                            
+}                            
+                            
+function replaceMode() {                            
+  mode = "replace";                            
+  status.textContent = "Modo replace: selecione 1 tela";                            
+}                            
+window.swapMode = swapMode;                            
+window.replaceMode = replaceMode;                            
+window.cycleLayout = cycleLayout;                            
+window.forceUpdate = forceUpdate;                            
+                            
+/* ---------------- START ---------------- */                            
+                            
+init();                            
+setInterval(forceUpdate, 60000);                            
+</script>                            
+                            
+</body>                            
 </html>
