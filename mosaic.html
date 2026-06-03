@@ -15,9 +15,6 @@
       font-family: Arial, sans-serif;
     }
 
-    /* -------------------------
-       CANVAS 16:9 FIXO
-    -------------------------- */
     body {
       display: flex;
       justify-content: center;
@@ -35,7 +32,6 @@
       overflow: hidden;
     }
 
-    /* CELULAS DOS VIDEOS */
     .cell {
       position: relative;
       width: 100%;
@@ -50,9 +46,6 @@
       border: 0;
     }
 
-    /* -------------------------
-       OVERLAY BASE (PASSO 7 PRÉVIO)
-    -------------------------- */
     #overlay {
       position: absolute;
       inset: 0;
@@ -80,7 +73,6 @@
       background: #333;
     }
 
-    /* STATUS */
     #status {
       position: absolute;
       top: 10px;
@@ -95,6 +87,7 @@
 <body>
 
 <div id="canvas"></div>
+
 <div id="overlay">
   <div class="btn">TROCAR</div>
   <div class="btn">SUBSTITUIR</div>
@@ -105,25 +98,17 @@
 <div id="status">Inicializando...</div>
 
 <script>
-/* =========================
-   CONFIG BASE
-========================= */
-
 const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
 const canvas = document.getElementById("canvas");
 const overlay = document.getElementById("overlay");
 const status = document.getElementById("status");
 
-/* canais selecionados no index.html */
 const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
 
-/* cache de estado (IMPORTANTE PASSO 6+) */
 let currentState = {};
-
-/* controle de loop */
 let isLoading = false;
-</script>
-<script>
+let overlayVisible = false;
+let overlayTimer = null;
 
 /* =========================
    GRID ENGINE
@@ -138,125 +123,42 @@ function clearCanvas() {
   canvas.innerHTML = "";
 }
 
-/* cria célula base */
 function createCell(channelId, contentNode) {
   const div = document.createElement("div");
   div.className = "cell";
   div.dataset.channel = channelId;
 
-  if (contentNode) {
-    div.appendChild(contentNode);
-  }
+  if (contentNode) div.appendChild(contentNode);
 
   return div;
 }
 
 /* =========================
-   LAYOUT ENGINE 1–6 LIVES
+   LAYOUT ENGINE
 ========================= */
 
 function applyLayout(channels) {
   const n = channels.length;
 
-  // 0
   if (n === 0) {
     setGrid(1, 1);
-    status.textContent = "Nenhuma live selecionada";
     return;
   }
 
-  // 1 LIVE
-  if (n === 1) {
-    setGrid(1, 1);
-  }
-
-  // 2 LIVES
-  else if (n === 2) {
-    setGrid(2, 1);
-  }
-
-  // 3 LIVES (2 em cima + 1 embaixo)
-  else if (n === 3) {
-    setGrid(2, 2);
-  }
-
-  // 4 LIVES (2x2)
-  else if (n === 4) {
-    setGrid(2, 2);
-  }
-
-  // 5 LIVES (3 em cima + 2 embaixo)
-  else if (n === 5) {
-    setGrid(3, 2);
-  }
-
-  // 6 LIVES (3x2)
-  else {
-    setGrid(3, 2);
-  }
+  if (n === 1) setGrid(1, 1);
+  else if (n === 2) setGrid(2, 1);
+  else if (n <= 4) setGrid(2, 2);
+  else if (n === 5) setGrid(3, 2);
+  else setGrid(3, 2);
 }
 
 /* =========================
-   RENDER BASE (PLACEHOLDERS)
-========================= */
-
-function renderSkeleton(channels) {
-  clearCanvas();
-  applyLayout(channels);
-
-  channels.slice(0, 6).forEach((ch, index) => {
-    const placeholder = document.createElement("div");
-    placeholder.style.width = "100%";
-    placeholder.style.height = "100%";
-    placeholder.style.display = "flex";
-    placeholder.style.alignItems = "center";
-    placeholder.style.justifyContent = "center";
-    placeholder.style.color = "#666";
-    placeholder.style.fontSize = "14px";
-    placeholder.textContent = ch;
-
-    const cell = createCell(ch, placeholder);
-    canvas.appendChild(cell);
-  });
-}
-
-/* =========================
-   INIT BASE VISUAL
-========================= */
-
-function init() {
-  if (!selected.length) {
-    status.textContent = "Nenhum canal selecionado";
-    return;
-  }
-
-  status.textContent = "Carregando layout...";
-  renderSkeleton(selected);
-}
-
-init();
-
-</script>
-<script>
-
-/* =========================
-   YOUTUBE EMBED BUILDER
+   EMBED
 ========================= */
 
 function buildEmbed(videoId) {
   return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
 }
-
-/* =========================
-   STATE CACHE (PASSO 6)
-========================= */
-
-let currentState = {}; 
-// { "@channel": "videoId" }
-
-/* =========================
-   CREATE IFRAME CELL
-========================= */
 
 function createIframe(videoId) {
   const iframe = document.createElement("iframe");
@@ -267,11 +169,11 @@ function createIframe(videoId) {
 }
 
 /* =========================
-   RENDER REAL STREAMS
+   RENDER
 ========================= */
 
 function renderStreams(data) {
-  const channels = Object.keys(data);
+  const channels = Object.keys(data || {});
 
   clearCanvas();
   applyLayout(channels);
@@ -283,12 +185,8 @@ function renderStreams(data) {
       ? createIframe(videoId)
       : (() => {
           const div = document.createElement("div");
-          div.style.width = "100%";
-          div.style.height = "100%";
-          div.style.display = "flex";
-          div.style.alignItems = "center";
-          div.style.justifyContent = "center";
-          div.style.color = "#666";
+          div.style.cssText =
+            "width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#666";
           div.textContent = "Offline";
           return div;
         })();
@@ -296,32 +194,26 @@ function renderStreams(data) {
     const cell = createCell(ch, content);
     canvas.appendChild(cell);
 
-    // salva estado inicial
     currentState[ch] = videoId;
   });
 }
 
 /* =========================
-   UPDATE SINGLE CELL (NO RELOAD ALL)
+   DIFF UPDATE
 ========================= */
 
 function updateCell(channel, newVideoId) {
   const cell = canvas.querySelector(`[data-channel="${channel}"]`);
   if (!cell) return;
 
-  const oldIframe = cell.querySelector("iframe");
-
-  if (oldIframe && newVideoId) {
-    oldIframe.src = buildEmbed(newVideoId);
+  const iframe = cell.querySelector("iframe");
+  if (iframe && newVideoId) {
+    iframe.src = buildEmbed(newVideoId);
   }
 }
 
-/* =========================
-   DIFF ENGINE (BASE DO PASSO 6 REAL)
-========================= */
-
 function diffUpdate(data) {
-  Object.keys(data).forEach(ch => {
+  Object.keys(data || {}).forEach(ch => {
     const newId = data[ch];
     const oldId = currentState[ch];
 
@@ -332,19 +224,8 @@ function diffUpdate(data) {
   });
 }
 
-    </script>
-    <script>
-
 /* =========================
-   WORKER CONFIG
-========================= */
-
-const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
-
-let isLoading = false;
-
-/* =========================
-   FETCH WORKER DATA
+   WORKER
 ========================= */
 
 async function fetchLiveData() {
@@ -352,21 +233,17 @@ async function fetchLiveData() {
 
   try {
     isLoading = true;
-    status.textContent = "Atualizando lives...";
+    status.textContent = "Atualizando...";
 
-    const res = await fetch(
-      `${WORKER_URL}?channels=${selected.join(",")}`
-    );
-
+    const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);
     const data = await res.json();
 
     status.textContent = "OK - ao vivo";
-
     return data;
 
-  } catch (err) {
-    console.error(err);
-    status.textContent = "Erro ao carregar Worker";
+  } catch (e) {
+    console.error(e);
+    status.textContent = "Erro Worker";
     return {};
   } finally {
     isLoading = false;
@@ -374,17 +251,15 @@ async function fetchLiveData() {
 }
 
 /* =========================
-   MAIN UPDATE CYCLE
+   LOOP
 ========================= */
 
 async function updateCycle() {
   if (isLoading) return;
 
   const data = await fetchLiveData();
-
   if (!data || Object.keys(data).length === 0) return;
 
-  // primeira renderização vs incremental
   if (Object.keys(currentState).length === 0) {
     renderStreams(data);
   } else {
@@ -392,53 +267,21 @@ async function updateCycle() {
   }
 }
 
-/* =========================
-   AUTO LOOP
-========================= */
-
 function startLoop() {
   updateCycle();
-
-  setInterval(() => {
-    updateCycle();
-  }, 60000); // 60s refresh
+  setInterval(updateCycle, 60000);
 }
 
 /* =========================
-   INIT ENTRYPOINT
+   OVERLAY
 ========================= */
-
-function initApp() {
-  if (!selected.length) {
-    status.textContent = "Nenhum canal selecionado";
-    return;
-  }
-
-  status.textContent = "Iniciando multiview...";
-  startLoop();
-}
-
-initApp();
-
-    </script>
-    <script>
-
-/* =========================
-   OVERLAY SYSTEM
-========================= */
-
-let overlayVisible = false;
-let overlayTimer = null;
 
 function showOverlay() {
   overlay.style.display = "flex";
   overlayVisible = true;
 
-  // auto-hide em 2.5s
   clearTimeout(overlayTimer);
-  overlayTimer = setTimeout(() => {
-    hideOverlay();
-  }, 2500);
+  overlayTimer = setTimeout(hideOverlay, 2500);
 }
 
 function hideOverlay() {
@@ -446,42 +289,27 @@ function hideOverlay() {
   overlayVisible = false;
 }
 
-/* =========================
-   TOGGLE OVERLAY (TOQUE/CLICK)
-========================= */
-
 function toggleOverlay() {
-  if (overlayVisible) {
-    hideOverlay();
-  } else {
-    showOverlay();
-  }
+  overlayVisible ? hideOverlay() : showOverlay();
 }
 
-/* ativa clique no canvas inteiro */
 canvas.addEventListener("click", toggleOverlay);
 
-/* =========================
-   BOTÕES (BASE FUNCIONAL)
-========================= */
+/* BUTTONS */
 
 const buttons = overlay.querySelectorAll(".btn");
 
-/* 0 - TROCAR (placeholder funcional)
-   futuro: swap de canais */
 buttons[0].onclick = () => {
-  status.textContent = "TROCAR (em breve)";
+  status.textContent = "TROCAR";
   hideOverlay();
 };
 
-/* 1 - SUBSTITUIR */
-buttons[1].onclick = async () => {
-  const ch = prompt("Digite o canal (@exemplo):");
-  const url = prompt("Cole a URL da live:");
+buttons[1].onclick = () => {
+  const ch = prompt("Canal:");
+  const url = prompt("URL:");
 
   if (!ch || !url) return;
 
-  // tenta extrair videoId simples
   const match = url.match(/([a-zA-Z0-9_-]{11})/);
 
   if (match) {
@@ -492,30 +320,33 @@ buttons[1].onclick = async () => {
   hideOverlay();
 };
 
-/* 2 - LAYOUT */
 buttons[2].onclick = () => {
-  status.textContent = "LAYOUT (em breve)";
   hideOverlay();
 };
 
-/* 3 - ATUALIZAR TODAS */
 buttons[3].onclick = async () => {
-  status.textContent = "Atualizando tudo...";
-
   const data = await fetchLiveData();
-
   clearCanvas();
   renderStreams(data);
-
   hideOverlay();
-});
+};
 
 /* =========================
-   FINAL INIT HOOK
+   INIT
 ========================= */
 
-document.addEventListener("DOMContentLoaded", () => {
-  hideOverlay();
-});
+function init() {
+  if (!selected.length) {
+    status.textContent = "Nenhum canal selecionado";
+    return;
+  }
 
-    </script>
+  startLoop();
+}
+
+init();
+
+</script>
+
+</body>
+</html>
