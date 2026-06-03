@@ -3,70 +3,91 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mosaic Multiview</title>
+  <title>Mosaic Live</title>
 
   <style>
     html, body {
       margin: 0;
+      padding: 0;
       height: 100%;
-      background: #000;
+      background: black;
       overflow: hidden;
       font-family: Arial, sans-serif;
     }
 
-    /* CENTRALIZAÇÃO DO CANVAS */
+    /* -------------------------
+       CANVAS 16:9 FIXO
+    -------------------------- */
     body {
       display: flex;
       justify-content: center;
       align-items: center;
     }
 
-    /* CANVAS 16:9 FIXO */
     #canvas {
       position: relative;
       width: 100vw;
-      height: 56.25vw; /* 16:9 */
+      height: 56.25vw;
+      max-width: 177.78vh;
       max-height: 100vh;
-      max-width: 177.78vh; /* 16:9 invertido */
-      background: #000;
       display: grid;
+      background: black;
       overflow: hidden;
     }
 
-    /* CÉLULAS DE VÍDEO */
+    /* CELULAS DOS VIDEOS */
     .cell {
       position: relative;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #000;
+      background: black;
     }
 
-    /* IFAMES (serão usados no passo 4) */
     iframe {
       width: 100%;
       height: 100%;
       border: 0;
     }
 
-    /* OVERLAY BASE (vai ser usado no passo 5) */
+    /* -------------------------
+       OVERLAY BASE (PASSO 7 PRÉVIO)
+    -------------------------- */
     #overlay {
       position: absolute;
       inset: 0;
+      background: rgba(0,0,0,0.65);
       display: none;
-      background: rgba(0,0,0,0.6);
       z-index: 10;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
     }
 
-    /* STATUS (debug leve) */
+    .btn {
+      background: #222;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid #333;
+      min-width: 160px;
+      text-align: center;
+    }
+
+    .btn:hover {
+      background: #333;
+    }
+
+    /* STATUS */
     #status {
       position: absolute;
       top: 10px;
       left: 10px;
       color: #aaa;
       font-size: 12px;
-      z-index: 20;
-      pointer-events: none;
+      z-index: 5;
     }
   </style>
 </head>
@@ -74,196 +95,152 @@
 <body>
 
 <div id="canvas"></div>
-<div id="overlay"></div>
+<div id="overlay">
+  <div class="btn">TROCAR</div>
+  <div class="btn">SUBSTITUIR</div>
+  <div class="btn">LAYOUT</div>
+  <div class="btn">ATUALIZAR TODAS</div>
+</div>
+
 <div id="status">Inicializando...</div>
+
 <script>
 /* =========================
-   LAYOUT ENGINE CORE
+   CONFIG BASE
 ========================= */
 
+const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
 const canvas = document.getElementById("canvas");
+const overlay = document.getElementById("overlay");
 const status = document.getElementById("status");
 
-/* Define grid base */
+/* canais selecionados no index.html */
+const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
+
+/* cache de estado (IMPORTANTE PASSO 6+) */
+let currentState = {};
+
+/* controle de loop */
+let isLoading = false;
+</script>
+<script>
+
+/* =========================
+   GRID ENGINE
+========================= */
+
 function setGrid(cols, rows) {
-  canvas.style.display = "grid";
   canvas.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   canvas.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 }
 
-/* Limpa canvas */
 function clearCanvas() {
   canvas.innerHTML = "";
 }
 
-/* Cria célula vazia (placeholder) */
-function createCell(label = "") {
+/* cria célula base */
+function createCell(channelId, contentNode) {
   const div = document.createElement("div");
   div.className = "cell";
-  div.innerHTML = `
-    <div style="
-      color:#666;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      height:100%;
-      font-size:14px;
-    ">
-      ${label}
-    </div>
-  `;
+  div.dataset.channel = channelId;
+
+  if (contentNode) {
+    div.appendChild(contentNode);
+  }
+
   return div;
 }
 
 /* =========================
-   LAYOUTS PRINCIPAIS
+   LAYOUT ENGINE 1–6 LIVES
 ========================= */
 
-function renderLayout(channels) {
-  clearCanvas();
-
+function applyLayout(channels) {
   const n = channels.length;
 
+  // 0
   if (n === 0) {
+    setGrid(1, 1);
     status.textContent = "Nenhuma live selecionada";
     return;
   }
 
-  status.textContent = `Renderizando ${n} lives`;
-
-  /* 1 LIVE */
+  // 1 LIVE
   if (n === 1) {
     setGrid(1, 1);
-    canvas.appendChild(createCell("Live 1"));
-    return;
   }
 
-  /* 2 LIVES */
-  if (n === 2) {
+  // 2 LIVES
+  else if (n === 2) {
     setGrid(2, 1);
-    canvas.appendChild(createCell("Live 1"));
-    canvas.appendChild(createCell("Live 2"));
-    return;
   }
 
-  /* 3 LIVES (2 em cima + 1 embaixo) */
-  if (n === 3) {
+  // 3 LIVES (2 em cima + 1 embaixo)
+  else if (n === 3) {
     setGrid(2, 2);
-
-    canvas.appendChild(createCell("Live 1"));
-    canvas.appendChild(createCell("Live 2"));
-
-    const bottom = document.createElement("div");
-    bottom.style.gridColumn = "1 / span 2";
-    bottom.appendChild(createCell("Live 3"));
-
-    canvas.appendChild(bottom);
-    return;
   }
 
-  /* 4 LIVES (2x2) */
-  if (n === 4) {
+  // 4 LIVES (2x2)
+  else if (n === 4) {
     setGrid(2, 2);
-    for (let i = 1; i <= 4; i++) {
-      canvas.appendChild(createCell(`Live ${i}`));
-    }
-    return;
   }
 
-  /* 5 LIVES (3 em cima + 2 embaixo) */
-  if (n === 5) {
+  // 5 LIVES (3 em cima + 2 embaixo)
+  else if (n === 5) {
     setGrid(3, 2);
-
-    canvas.appendChild(createCell("Live 1"));
-    canvas.appendChild(createCell("Live 2"));
-    canvas.appendChild(createCell("Live 3"));
-
-    const b1 = document.createElement("div");
-    b1.appendChild(createCell("Live 4"));
-
-    const b2 = document.createElement("div");
-    b2.appendChild(createCell("Live 5"));
-
-    canvas.appendChild(b1);
-    canvas.appendChild(b2);
-    return;
   }
 
-  /* 6 LIVES (3x2) */
-  if (n === 6) {
+  // 6 LIVES (3x2)
+  else {
     setGrid(3, 2);
-    for (let i = 1; i <= 6; i++) {
-      canvas.appendChild(createCell(`Live ${i}`));
-    }
-    return;
   }
+}
 
-  /* FALLBACK */
-  setGrid(2, 2);
-  channels.slice(0, 4).forEach((_, i) => {
-    canvas.appendChild(createCell(`Live ${i + 1}`));
+/* =========================
+   RENDER BASE (PLACEHOLDERS)
+========================= */
+
+function renderSkeleton(channels) {
+  clearCanvas();
+  applyLayout(channels);
+
+  channels.slice(0, 6).forEach((ch, index) => {
+    const placeholder = document.createElement("div");
+    placeholder.style.width = "100%";
+    placeholder.style.height = "100%";
+    placeholder.style.display = "flex";
+    placeholder.style.alignItems = "center";
+    placeholder.style.justifyContent = "center";
+    placeholder.style.color = "#666";
+    placeholder.style.fontSize = "14px";
+    placeholder.textContent = ch;
+
+    const cell = createCell(ch, placeholder);
+    canvas.appendChild(cell);
   });
 }
-</script>
-<script>
-/* =========================
-   CONFIG
-========================= */
-
-const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
-
-/* canais selecionados no index.html */
-const selectedChannels =
-  JSON.parse(localStorage.getItem("selectedChannels") || "[]");
-
-/* estado atual dos vídeos */
-let liveState = {};
 
 /* =========================
-   FETCH WORKER
+   INIT BASE VISUAL
 ========================= */
 
-async function fetchLives() {
-  try {
-    status.textContent = "Carregando lives...";
-
-    const url = `${WORKER_URL}?channels=${selectedChannels.join(",")}`;
-
-    const res = await fetch(url);
-    const data = await res.json();
-
-    return data;
-
-  } catch (err) {
-    console.error("Worker error:", err);
-    status.textContent = "Erro ao buscar Worker";
-    return {};
+function init() {
+  if (!selected.length) {
+    status.textContent = "Nenhum canal selecionado";
+    return;
   }
+
+  status.textContent = "Carregando layout...";
+  renderSkeleton(selected);
 }
 
-/* =========================
-   INIT SYSTEM
-========================= */
-
-async function init() {
-  const data = await fetchLives();
-
-  liveState = data;
-
-  const channels = Object.keys(liveState);
-
-  /* chama layout engine (Parte 2) */
-  renderLayout(channels);
-
-  status.textContent = "Lives carregadas";
-}
-
-/* inicializa */
 init();
+
 </script>
 <script>
+
 /* =========================
-   EMBED CONFIG
+   YOUTUBE EMBED BUILDER
 ========================= */
 
 function buildEmbed(videoId) {
@@ -271,368 +248,274 @@ function buildEmbed(videoId) {
 }
 
 /* =========================
-   RENDER MAP (CANAL -> CELL)
+   STATE CACHE (PASSO 6)
 ========================= */
 
-let cellMap = {}; // { channel: element }
-let currentCache = {}; // { channel: videoId }
+let currentState = {}; 
+// { "@channel": "videoId" }
 
 /* =========================
-   CREATE REAL CELL
+   CREATE IFRAME CELL
 ========================= */
 
-function createVideoCell(channel, videoId) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "cell";
-  wrapper.dataset.channel = channel;
-
+function createIframe(videoId) {
   const iframe = document.createElement("iframe");
   iframe.src = buildEmbed(videoId);
   iframe.allow = "autoplay; encrypted-media";
   iframe.allowFullscreen = true;
-
-  wrapper.appendChild(iframe);
-
-  return wrapper;
+  return iframe;
 }
 
 /* =========================
-   INITIAL RENDER (FIRST LOAD)
+   RENDER REAL STREAMS
 ========================= */
 
-function renderInitial(channels) {
+function renderStreams(data) {
+  const channels = Object.keys(data);
+
   clearCanvas();
+  applyLayout(channels);
 
-  cellMap = {};
+  channels.slice(0, 6).forEach((ch) => {
+    const videoId = data[ch];
 
-  channels.forEach((channel, index) => {
-    const videoId = liveState[channel];
+    const content = videoId
+      ? createIframe(videoId)
+      : (() => {
+          const div = document.createElement("div");
+          div.style.width = "100%";
+          div.style.height = "100%";
+          div.style.display = "flex";
+          div.style.alignItems = "center";
+          div.style.justifyContent = "center";
+          div.style.color = "#666";
+          div.textContent = "Offline";
+          return div;
+        })();
 
-    const cell = createVideoCell(channel, videoId);
-
-    cellMap[channel] = cell;
-    currentCache[channel] = videoId;
-
+    const cell = createCell(ch, content);
     canvas.appendChild(cell);
+
+    // salva estado inicial
+    currentState[ch] = videoId;
   });
 }
 
 /* =========================
-   UPDATE SINGLE CELL (NO RELOAD)
+   UPDATE SINGLE CELL (NO RELOAD ALL)
 ========================= */
 
 function updateCell(channel, newVideoId) {
-  const cell = cellMap[channel];
+  const cell = canvas.querySelector(`[data-channel="${channel}"]`);
   if (!cell) return;
 
-  const iframe = cell.querySelector("iframe");
+  const oldIframe = cell.querySelector("iframe");
 
-  if (iframe) {
-    iframe.src = buildEmbed(newVideoId);
+  if (oldIframe && newVideoId) {
+    oldIframe.src = buildEmbed(newVideoId);
   }
-
-  currentCache[channel] = newVideoId;
 }
 
 /* =========================
-   DIFF ENGINE (CORE INTELIGENTE)
+   DIFF ENGINE (BASE DO PASSO 6 REAL)
 ========================= */
 
-function applyDiff(newState) {
-  Object.keys(newState).forEach(channel => {
-    const newId = newState[channel];
-    const oldId = currentCache[channel];
-
-    if (!oldId) return;
+function diffUpdate(data) {
+  Object.keys(data).forEach(ch => {
+    const newId = data[ch];
+    const oldId = currentState[ch];
 
     if (newId && newId !== oldId) {
-      updateCell(channel, newId);
+      updateCell(ch, newId);
+      currentState[ch] = newId;
     }
   });
 }
 
+    </script>
+    <script>
+
 /* =========================
-   OVERWRITE INIT (HOOK DA PARTE 3)
+   WORKER CONFIG
 ========================= */
 
-async function initRender() {
-  const channels = Object.keys(liveState);
+const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";
 
-  renderLayout(channels);
-  renderInitial(channels);
+let isLoading = false;
 
-  status.textContent = "Multiview ativo";
+/* =========================
+   FETCH WORKER DATA
+========================= */
+
+async function fetchLiveData() {
+  if (!selected.length) return {};
+
+  try {
+    isLoading = true;
+    status.textContent = "Atualizando lives...";
+
+    const res = await fetch(
+      `${WORKER_URL}?channels=${selected.join(",")}`
+    );
+
+    const data = await res.json();
+
+    status.textContent = "OK - ao vivo";
+
+    return data;
+
+  } catch (err) {
+    console.error(err);
+    status.textContent = "Erro ao carregar Worker";
+    return {};
+  } finally {
+    isLoading = false;
+  }
 }
 
-/* sobrescreve init da parte 3 */
-init = async function () {
-  const data = await fetchLives();
+/* =========================
+   MAIN UPDATE CYCLE
+========================= */
 
-  liveState = data;
+async function updateCycle() {
+  if (isLoading) return;
 
-  await initRender();
-};
-</script>
-<script>
+  const data = await fetchLiveData();
+
+  if (!data || Object.keys(data).length === 0) return;
+
+  // primeira renderização vs incremental
+  if (Object.keys(currentState).length === 0) {
+    renderStreams(data);
+  } else {
+    diffUpdate(data);
+  }
+}
+
+/* =========================
+   AUTO LOOP
+========================= */
+
+function startLoop() {
+  updateCycle();
+
+  setInterval(() => {
+    updateCycle();
+  }, 60000); // 60s refresh
+}
+
+/* =========================
+   INIT ENTRYPOINT
+========================= */
+
+function initApp() {
+  if (!selected.length) {
+    status.textContent = "Nenhum canal selecionado";
+    return;
+  }
+
+  status.textContent = "Iniciando multiview...";
+  startLoop();
+}
+
+initApp();
+
+    </script>
+    <script>
+
 /* =========================
    OVERLAY SYSTEM
 ========================= */
 
-const overlay = document.getElementById("overlay");
+let overlayVisible = false;
+let overlayTimer = null;
 
-/* cria UI do overlay */
-function createOverlayUI() {
-  overlay.innerHTML = `
-    <div id="overlayMenu" style="
-      position:absolute;
-      bottom:20px;
-      left:50%;
-      transform:translateX(-50%);
-      display:flex;
-      gap:10px;
-      background:rgba(20,20,20,0.9);
-      padding:10px;
-      border-radius:10px;
-      z-index:999;
-    ">
-
-      <button onclick="openSwap()" style="padding:10px;">TROCAR</button>
-      <button onclick="openReplace()" style="padding:10px;">SUBSTITUIR</button>
-      <button onclick="openLayout()" style="padding:10px;">LAYOUT</button>
-      <button onclick="manualRefresh()" style="padding:10px;">ATUALIZAR</button>
-
-    </div>
-  `;
-}
-
-/* mostra overlay */
 function showOverlay() {
-  overlay.style.display = "block";
-  createOverlayUI();
+  overlay.style.display = "flex";
+  overlayVisible = true;
 
-  clearTimeout(window.__overlayTimer);
-
-  window.__overlayTimer = setTimeout(() => {
+  // auto-hide em 2.5s
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(() => {
     hideOverlay();
   }, 2500);
 }
 
-/* esconde overlay */
 function hideOverlay() {
   overlay.style.display = "none";
+  overlayVisible = false;
 }
 
-/* toggle */
+/* =========================
+   TOGGLE OVERLAY (TOQUE/CLICK)
+========================= */
+
 function toggleOverlay() {
-  if (overlay.style.display === "block") {
+  if (overlayVisible) {
     hideOverlay();
   } else {
     showOverlay();
   }
 }
 
-/* click na tela ativa overlay */
-document.addEventListener("click", (e) => {
-  toggleOverlay();
+/* ativa clique no canvas inteiro */
+canvas.addEventListener("click", toggleOverlay);
+
+/* =========================
+   BOTÕES (BASE FUNCIONAL)
+========================= */
+
+const buttons = overlay.querySelectorAll(".btn");
+
+/* 0 - TROCAR (placeholder funcional)
+   futuro: swap de canais */
+buttons[0].onclick = () => {
+  status.textContent = "TROCAR (em breve)";
+  hideOverlay();
+};
+
+/* 1 - SUBSTITUIR */
+buttons[1].onclick = async () => {
+  const ch = prompt("Digite o canal (@exemplo):");
+  const url = prompt("Cole a URL da live:");
+
+  if (!ch || !url) return;
+
+  // tenta extrair videoId simples
+  const match = url.match(/([a-zA-Z0-9_-]{11})/);
+
+  if (match) {
+    currentState[ch] = match[1];
+    diffUpdate({ [ch]: match[1] });
+  }
+
+  hideOverlay();
+};
+
+/* 2 - LAYOUT */
+buttons[2].onclick = () => {
+  status.textContent = "LAYOUT (em breve)";
+  hideOverlay();
+};
+
+/* 3 - ATUALIZAR TODAS */
+buttons[3].onclick = async () => {
+  status.textContent = "Atualizando tudo...";
+
+  const data = await fetchLiveData();
+
+  clearCanvas();
+  renderStreams(data);
+
+  hideOverlay();
 });
 
 /* =========================
-   ACTION HOOKS (PARTE 6 IMPLEMENTA LOGIC)
+   FINAL INIT HOOK
 ========================= */
 
-function openSwap() {
-  status.textContent = "Swap (em breve)";
-}
+document.addEventListener("DOMContentLoaded", () => {
+  hideOverlay();
+});
 
-function openReplace() {
-  status.textContent = "Replace (em breve)";
-}
-
-function openLayout() {
-  status.textContent = "Layout (em breve)";
-}
-
-/* refresh manual chama Worker */
-async function manualRefresh() {
-  status.textContent = "Atualizando...";
-
-  const data = await fetchLives();
-  liveState = data;
-
-  applyDiff(data);
-
-  status.textContent = "Atualizado";
-}
-
-/* inicializa overlay */
-createOverlayUI();
-</script>
-<script>
-/* =========================
-   SWAP SYSTEM (TROCA POSIÇÃO)
-========================= */
-
-let swapSelection = [];
-
-/* ativa modo swap */
-function openSwap() {
-  status.textContent = "Selecione 2 lives para trocar";
-
-  swapSelection = [];
-
-  Object.keys(cellMap).forEach(ch => {
-    const el = cellMap[ch];
-
-    el.onclick = () => {
-      if (swapSelection.includes(ch)) {
-        swapSelection = swapSelection.filter(x => x !== ch);
-        el.style.outline = "none";
-        return;
-      }
-
-      swapSelection.push(ch);
-      el.style.outline = "2px solid lime";
-
-      if (swapSelection.length === 2) {
-        swapChannels(swapSelection[0], swapSelection[1]);
-      }
-    };
-  });
-}
-
-/* executa swap */
-function swapChannels(a, b) {
-  const temp = currentState[a];
-  currentState[a] = currentState[b];
-  currentState[b] = temp;
-
-  updateCell(a, currentState[a]);
-  updateCell(b, currentState[b]);
-
-  persistState();
-
-  status.textContent = "Swap concluído";
-
-  resetSwap();
-}
-
-/* reset swap UI */
-function resetSwap() {
-  swapSelection = [];
-
-  Object.values(cellMap).forEach(el => {
-    el.style.outline = "none";
-    el.onclick = null;
-  });
-}
-
-/* =========================
-   REPLACE SYSTEM (SUBSTITUIR STREAM)
-========================= */
-
-function openReplace() {
-  const channel = prompt("Digite o canal (@exemplo) ou selecione mentalmente:");
-  const url = prompt("Cole nova URL do YouTube:");
-
-  if (!channel || !url) return;
-
-  const videoId = extractVideoId(url);
-
-  if (!videoId) {
-    alert("URL inválida");
-    return;
-  }
-
-  currentState[channel] = videoId;
-
-  updateCell(channel, videoId);
-
-  persistState();
-
-  status.textContent = "Stream substituída";
-}
-
-/* extrai ID de qualquer URL do YouTube */
-function extractVideoId(url) {
-  const match =
-    url.match(/v=([a-zA-Z0-9_-]{11})/) ||
-    url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) ||
-    url.match(/embed\/([a-zA-Z0-9_-]{11})/);
-
-  return match ? match[1] : null;
-}
-
-/* =========================
-   LAYOUT PLACEHOLDER (FUTURO)
-========================= */
-
-function openLayout() {
-  status.textContent = "Layout switch (já ativo via engine)";
-}
-
-/* =========================
-   PERSISTÊNCIA LOCAL
-========================= */
-
-function persistState() {
-  localStorage.setItem("mosaic_state", JSON.stringify(currentState));
-}
-
-/* restaura estado */
-function restoreState() {
-  const saved = localStorage.getItem("mosaic_state");
-
-  if (!saved) return;
-
-  try {
-    currentState = JSON.parse(saved);
-  } catch (e) {
-    console.error("restore error", e);
-  }
-}
-
-/* =========================
-   AUTO REFRESH OTIMIZADO
-========================= */
-
-setInterval(async () => {
-  const data = await fetchLives();
-
-  Object.keys(data).forEach(ch => {
-    const newId = data[ch];
-    const oldId = currentState[ch];
-
-    if (newId && newId !== oldId) {
-      currentState[ch] = newId;
-      updateCell(ch, newId);
-    }
-  });
-
-  persistState();
-}, 60000);
-
-/* =========================
-   INIT FINAL
-========================= */
-
-(function boot() {
-  restoreState();
-
-  if (Object.keys(currentState).length > 0) {
-    const channels = Object.keys(currentState);
-
-    renderLayout(channels);
-
-    clearCanvas();
-
-    channels.forEach(ch => {
-      const cell = createVideoCell(ch, currentState[ch]);
-
-      cellMap[ch] = cell;
-      canvas.appendChild(cell);
-    });
-  }
-
-  status.textContent = "Mosaic pronto";
-})();
-</script>
+    </script>
