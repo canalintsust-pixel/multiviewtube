@@ -1,99 +1,97 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MultiviewTube</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MultiviewTube</title>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #0b0b0b;
-      color: #fff;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0b0b0b;
+  color: #fff;
+}
 
-    header {
-      padding: 16px;
-      text-align: center;
-      font-size: 20px;
-      background: #111;
-      border-bottom: 1px solid #222;
-    }
+header {
+  padding: 16px;
+  text-align: center;
+  font-size: 20px;
+  background: #111;
+  border-bottom: 1px solid #222;
+}
 
-    .container {
-      padding: 16px;
-      max-width: 900px;
-      margin: 0 auto;
-    }
+.container {
+  padding: 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
 
-    .channel {
-      display: flex;
-      align-items: center;
-      padding: 10px;
-      margin: 6px 0;
-      background: #161616;
-      border-radius: 8px;
-      cursor: pointer;
-      user-select: none;
-    }
+.channel {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  margin: 6px 0;
+  background: #161616;
+  border-radius: 8px;
+  cursor: pointer;
+}
 
-    .channel input {
-      transform: scale(1.4);
-      margin-right: 12px;
-    }
+.channel:hover {
+  background: #1f1f1f;
+}
 
-    .channel:hover {
-      background: #1f1f1f;
-    }
+.channel input {
+  transform: scale(1.4);
+  margin-right: 12px;
+  pointer-events: none;
+}
 
-    .footer {
-      position: sticky;
-      bottom: 0;
-      background: #111;
-      padding: 12px;
-      border-top: 1px solid #222;
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-    }
+.footer {
+  position: sticky;
+  bottom: 0;
+  background: #111;
+  padding: 12px;
+  border-top: 1px solid #222;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
 
-    button {
-      padding: 12px 16px;
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-    }
+button {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
 
-    #openBtn {
-      background: #ff0000;
-      color: white;
-    }
+#openBtn {
+  background: #ff0000;
+  color: white;
+}
 
-    #clearBtn {
-      background: #333;
-      color: white;
-    }
+#clearBtn {
+  background: #333;
+  color: white;
+}
 
-    .counter {
-      text-align: center;
-      margin-top: 8px;
-      color: #aaa;
-      font-size: 13px;
-    }
-  </style>
+.counter {
+  text-align: center;
+  margin-top: 8px;
+  color: #aaa;
+  font-size: 13px;
+}
+</style>
 </head>
 
 <body>
 
-<header>
-  MultiviewTube
-</header>
+<header>MultiviewTube</header>
 
 <div class="container" id="channelList"></div>
 
-<div class="counter" id="counter">0 / 6 selecionados</div>
+<div class="counter" id="counter"></div>
 
 <div class="footer">
   <button id="clearBtn">LIMPAR</button>
@@ -114,62 +112,143 @@ const channels = [
 ];
 
 const MAX = 6;
-const listEl = document.getElementById("channelList");
-const counterEl = document.getElementById("counter");
 
-let selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
+const listEl =
+document.getElementById("channelList");
 
-function render() {
+const counterEl =
+document.getElementById("counter");
+
+let selected =
+JSON.parse(
+localStorage.getItem("selectedChannels") || "[]"
+);
+
+/* =========================
+   RENDER
+========================= */
+
+function render(){
+
   listEl.innerHTML = "";
 
   channels.forEach(ch => {
-    const div = document.createElement("div");
+
+    const div =
+    document.createElement("div");
+
     div.className = "channel";
 
-    const checked = selected.includes(ch.id);
+    const checked =
+    selected.includes(ch.id);
 
     div.innerHTML = `
-      <input type="checkbox" ${checked ? "checked" : ""} />
+      <input type="checkbox" ${checked ? "checked" : ""}/>
       <span>${ch.name}</span>
     `;
 
     div.onclick = () => toggleChannel(ch.id);
 
     listEl.appendChild(div);
+
   });
 
   updateCounter();
+
 }
 
-function toggleChannel(id) {
-  const index = selected.indexOf(id);
+/* =========================
+   TOGGLE
+========================= */
 
-  if (index >= 0) {
-    selected.splice(index, 1);
+function toggleChannel(id){
+
+  const index =
+  selected.indexOf(id);
+
+  if(index >= 0){
+
+    selected.splice(index,1);
+
   } else {
-    if (selected.length >= MAX) return;
+
+    if(selected.length >= MAX){
+      return;
+    }
+
     selected.push(id);
+
   }
 
-  localStorage.setItem("selectedChannels", JSON.stringify(selected));
+  sync();
+
+}
+
+/* =========================
+   SYNC STATE
+========================= */
+
+function sync(){
+
+  localStorage.setItem(
+    "selectedChannels",
+    JSON.stringify(selected)
+  );
+
+  updateCounter();
+
   render();
+
 }
 
-function updateCounter() {
-  counterEl.textContent = `${selected.length} / ${MAX} selecionados`;
+/* =========================
+   COUNTER
+========================= */
+
+function updateCounter(){
+
+  counterEl.textContent =
+  `${selected.length} / ${MAX} selecionados`;
+
 }
 
-document.getElementById("clearBtn").onclick = () => {
+/* =========================
+   LIMPAR
+========================= */
+
+document.getElementById("clearBtn")
+.onclick = () => {
+
   selected = [];
+
   localStorage.removeItem("selectedChannels");
-  render();
+
+  sync();
+
 };
 
-document.getElementById("openBtn").onclick = () => {
-  if (selected.length === 0) return;
+/* =========================
+   ABRIR MOSAICO (CORRIGIDO)
+========================= */
 
-  localStorage.setItem("selectedChannels", JSON.stringify(selected));
-  window.location.href = "mosaic.html";
+document.getElementById("openBtn")
+.onclick = () => {
+
+  if(selected.length === 0){
+    return;
+  }
+
+  // 🔥 ISSO CORRIGE O BUG PRINCIPAL
+  localStorage.removeItem("mosaicState");
+
+  localStorage.setItem(
+    "selectedChannels",
+    JSON.stringify(selected)
+  );
+
+  window.location.href =
+  "mosaic.html";
+
 };
 
 render();
