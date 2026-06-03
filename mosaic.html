@@ -1,346 +1,1469 @@
-<!DOCTYPE html>  <html lang="pt-br">  
-<head>  
-  <meta charset="UTF-8" />  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>  
-  <title>Mosaic Live</title>    <style>  
-    html, body {  
-      margin: 0;  
-      height: 100%;  
-      background: black;  
-      overflow: hidden;  
-    }  
-  
-    body {  
-      display: flex;  
-      justify-content: center;  
-      align-items: center;  
-    }  
-  
-    #canvas {  
-      position: relative;  
-      width: 100vw;  
-      height: 56.25vw;  
-      max-height: 100vh;  
-      max-width: 177.78vh;  
-      display: grid;  
-      background: black;  
-    }  
-  
-    .cell {  
-      position: relative;  
-      overflow: hidden;  
-      background: black;  
-    }  
-  
-    iframe {  
-      width: 100%;  
-      height: 100%;  
-      border: 0;  
-    }  
-  
-    /* ---------------- OVERLAY ---------------- */  
-  
-    #overlay {  
-      position: absolute;  
-      inset: 0;  
-      background: rgba(0,0,0,0.65);  
-      display: none;  
-      flex-direction: column;  
-      justify-content: center;  
-      align-items: center;  
-      gap: 12px;  
-      z-index: 999;  
-    }  
-  
-    .btn {  
-      padding: 12px 18px;  
-      background: #222;  
-      color: white;  
-      border: 1px solid #444;  
-      border-radius: 8px;  
-      font-family: Arial;  
-      cursor: pointer;  
-      min-width: 180px;  
-      text-align: center;  
-    }  
-  
-    .btn:hover {  
-      background: #333;  
-    }  
-  
-    #status {  
-      position: absolute;  
-      top: 10px;  
-      left: 10px;  
-      color: #aaa;  
-      font-family: Arial;  
-      font-size: 12px;  
-      z-index: 10;  
-    }  
-  </style>  </head>  <body>  <div id="canvas"></div>  
-<div id="status">Carregando...</div>  <div id="overlay">  
-  <div class="btn" onclick="swapMode()">TROCAR</div>  
-  <div class="btn" onclick="replaceMode()">SUBSTITUIR</div>  
-  <div class="btn" onclick="cycleLayout()">LAYOUT</div>  
-  <div class="btn" onclick="forceUpdate()">ATUALIZAR TODAS</div>  
-</div>  <script>  
-const canvas = document.getElementById("canvas");  
-const overlay = document.getElementById("overlay");  
-const status = document.getElementById("status");  
-  
-const WORKER_URL = "https://polished-smoke-6d50.canalintsust.workers.dev/";  
-const selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");  
-  
-/* ---------------- STATE ---------------- */  
-  
-let state = []; // [{channel, videoId}]  
-let selectedCells = [];  
-let overlayTimer = null;  
-let mode = null; // "swap" | "replace"  
-  
-/* ---------------- GRID ---------------- */  
-  
-function setGrid(c, r) {  
-  canvas.style.gridTemplateColumns = `repeat(${c}, 1fr)`;  
-  canvas.style.gridTemplateRows = `repeat(${r}, 1fr)`;  
-}  
-  
-/* ---------------- EMBED ---------------- */  
-  
-function buildEmbed(id) {  
-  return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;  
-}  
-  
-/* ---------------- CELL ---------------- */  
-  
-function createCell(item, index) {  
-  const div = document.createElement("div");  
-  div.className = "cell";  
-  div.dataset.index = index;  
-  
-  const iframe = document.createElement("iframe");  
-  iframe.src = buildEmbed(item.videoId);  
-  
-  div.appendChild(iframe);  
-  
-  div.onclick = () => toggleSelect(div, index);  
-  
-  return div;  
-}  
-  
-function updateCell(index, videoId) {  
-  const cell = canvas.querySelector(`[data-index="${index}"]`);  
-  if (!cell) return;  
-  
-  const iframe = cell.querySelector("iframe");  
-  iframe.src = buildEmbed(videoId);  
-}  
-  
-/* ---------------- SELECTION ---------------- */  
-  
-  
-function toggleSelect(cell, index) {  
-  // MODO SWAP  
-  if (mode === "swap") {  
-    handleSwapSelection(cell, index);  
-    return;  
-  }  
-  
-  // MODO REPLACE  
-  if (mode === "replace") {  
-    selectedCells = [index];  
-    replaceSelected();  
-    mode = null;  
-    return;  
-  }  
-  
-  // fallback visual (modo normal)  
-  if (selectedCells.includes(index)) {  
-    selectedCells = selectedCells.filter(i => i !== index);  
-    cell.style.outline = "none";  
-  } else {  
-    if (selectedCells.length >= 2) return;  
-  
-    selectedCells.push(index);  
-    cell.style.outline = "2px solid lime";  
-  }  
-}  
-  
-/* ---------------- LAYOUT ---------------- */  
-  
-function applyLayout(n) {  
-  if (n === 1) setGrid(1,1);  
-  else if (n === 2) setGrid(2,1);  
-  else if (n <= 4) setGrid(2,2);  
-  else setGrid(3,2);  
-}  
-  
-/* ---------------- RENDER ---------------- */  
-  
-function render() {  
-  canvas.innerHTML = "";  
-  applyLayout(state.length);  
-  
-  state.forEach((item, i) => {  
-    const cell = createCell(item, i);  
-    canvas.appendChild(cell);  
-  });  
-}  
-  
-/* ---------------- SWAP ---------------- */  
-  
-function swapSelected() {  
-  if (selectedCells.length !== 2) return;  
-  
-  const [a, b] = selectedCells;  
-  
-  const temp = state[a];  
-  state[a] = state[b];  
-  state[b] = temp;  
-  
-  saveState();  
-  render();  
-  
-  selectedCells = [];  
-}  
-function handleSwapSelection(cell, index) {  
-  if (selectedCells.includes(index)) {  
-    selectedCells = selectedCells.filter(i => i !== index);  
-    cell.style.outline = "none";  
-    return;  
-  }  
-  
-  selectedCells.push(index);  
-  cell.style.outline = "2px solid lime";  
-  
-  if (selectedCells.length === 2) {  
-    swapSelected();  
-    mode = null;  
-  }  
-}  
-/* ---------------- REPLACE ---------------- */  
-  
-function replaceSelected() {  
-  if (selectedCells.length !== 1) return;  
-  
-  const index = selectedCells[0];  
-  const url = prompt("Cole nova URL do YouTube (@canal/live ou video)");  
-  
-  if (!url) return;  
-  
-  // extrai videoId simples  
-  const match = url.match(/([a-zA-Z0-9_-]{11})/);  
-  
-  if (!match) return;  
-  
-  state[index].videoId = match[1];  
-  
-  saveState();  
-  updateCell(index, match[1]);  
-  
-  selectedCells = [];  
-}  
-  
-/* ---------------- LAYOUT CYCLE ---------------- */  
-  
-let layoutMode = 0;  
-function cycleLayout() {  
-  layoutMode = (layoutMode + 1) % 3;  
-  
-  const n = state.length;  
-  
-  if (layoutMode === 0) setGrid(1,1);  
-  if (layoutMode === 1) setGrid(2,2);  
-  if (layoutMode === 2) setGrid(3,2);  
-}  
-  
-/* ---------------- UPDATE ALL ---------------- */  
-  
-async function forceUpdate() {  
-  status.textContent = "Atualizando...";  
-  
-  const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);  
-  const data = await res.json();  
-  
-  state.forEach((item, i) => {  
-    const newId = data[item.channel];  
-  
-    if (newId && newId !== item.videoId) {  
-      item.videoId = newId;  
-      updateCell(i, newId);  
-    }  
-  });  
-  
-  saveState();  
-  status.textContent = "AO VIVO";  
-}  
-  
-/* ---------------- PERSIST ---------------- */  
-  
-function saveState() {  
-  localStorage.setItem("mosaicState", JSON.stringify(state));  
-}  
-  
-/* ---------------- LOAD ---------------- */  
-  
-async function init() {  
-  const saved = localStorage.getItem("mosaicState");  
-  
-  if (saved) {  
-    state = JSON.parse(saved);  
-    render();  
-    return;  
-  }  
-  
-  const res = await fetch(`${WORKER_URL}?channels=${selected.join(",")}`);  
-  const data = await res.json();  
-  
-  state = Object.keys(data).map(ch => ({  
-    channel: ch,  
-    videoId: data[ch]  
-  }));  
-  
-  saveState();  
-  render();  
-}  
-  
-/* ---------------- OVERLAY ---------------- */  
-  
-function showOverlay() {  
-  overlay.style.display = "flex";  
-  
-  clearTimeout(overlayTimer);  
-  overlayTimer = setTimeout(() => {  
-    overlay.style.display = "none";  
-  }, 2500);  
-}  
-  
-document.body.addEventListener("click", (e) => {  
-  if (e.target.closest("iframe")) return;  
-  if (e.target.classList.contains("btn")) return;  
-  if (mode) return; // evita overlay durante operação  
-  
-  showOverlay();  
-});  
-  
-/* ---------------- ACTION HOOKS ---------------- */  
-function swapMode() {  
-  mode = "swap";  
-  status.textContent = "Modo swap: selecione 2 telas";  
-}  
-  
-function replaceMode() {  
-  mode = "replace";  
-  status.textContent = "Modo replace: selecione 1 tela";  
-}  
-window.swapMode = swapMode;  
-window.replaceMode = replaceMode;  
-window.cycleLayout = cycleLayout;  
-window.forceUpdate = forceUpdate;  
-  
-/* ---------------- START ---------------- */  
-  
-init();  
-setInterval(forceUpdate, 60000);  
-</script>  </body>  
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport"
+content="width=device-width,
+initial-scale=1,
+maximum-scale=1,
+user-scalable=no">
+
+<title>MultiView Mosaic</title>
+
+<style>
+
+/* =====================================
+   BASE
+===================================== */
+
+html,
+body{
+
+    margin:0;
+    padding:0;
+
+    width:100%;
+    height:100%;
+
+    background:#000;
+
+    overflow:hidden;
+
+    position:fixed;
+    inset:0;
+
+    font-family:Arial,sans-serif;
+}
+
+/* =====================================
+   CANVAS 16:9
+===================================== */
+
+#stage{
+
+    position:absolute;
+
+    top:50%;
+    left:50%;
+
+    transform:translate(-50%,-50%);
+
+    width:100vw;
+    height:calc(100vw * 9 / 16);
+
+    max-width:calc(100vh * 16 / 9);
+    max-height:100vh;
+
+    background:#000;
+
+    display:grid;
+
+    gap:2px;
+
+    overflow:hidden;
+}
+
+/* =====================================
+   TILES
+===================================== */
+
+.tile{
+
+    position:relative;
+
+    width:100%;
+    height:100%;
+
+    background:#000;
+
+    overflow:hidden;
+}
+
+.tile iframe{
+
+    width:100%;
+    height:100%;
+
+    border:none;
+
+    display:block;
+}
+
+/* =====================================
+   OVERLAY
+===================================== */
+
+#overlay{
+
+    position:fixed;
+
+    top:10px;
+    right:10px;
+
+    z-index:9999;
+
+    display:flex;
+
+    gap:6px;
+
+    opacity:0;
+
+    pointer-events:none;
+
+    transition:opacity .25s;
+}
+
+#overlay.show{
+
+    opacity:1;
+
+    pointer-events:auto;
+}
+
+.ctrlBtn{
+
+    border:none;
+
+    background:#ff0000;
+
+    color:#fff;
+
+    padding:10px 12px;
+
+    border-radius:8px;
+
+    font-size:13px;
+
+    font-weight:bold;
+}
+
+/* =====================================
+   MODAL
+===================================== */
+
+.modal{
+
+    position:fixed;
+
+    inset:0;
+
+    background:rgba(0,0,0,.88);
+
+    display:none;
+
+    align-items:center;
+
+    justify-content:center;
+
+    z-index:10000;
+}
+
+.modalContent{
+
+    position:relative;
+
+    width:85%;
+
+    max-width:700px;
+
+    max-height:85%;
+
+    overflow:auto;
+
+    background:#111;
+
+    border-radius:12px;
+
+    padding:18px;
+
+    color:white;
+}
+
+/* =====================================
+   CLOSE BUTTON
+===================================== */
+
+.closeBtn{
+
+    position:absolute;
+
+    top:10px;
+    right:10px;
+
+    border:none;
+
+    background:#444;
+
+    color:white;
+
+    border-radius:6px;
+
+    padding:6px 10px;
+
+    font-size:12px;
+}
+
+/* =====================================
+   SWAP GRID
+===================================== */
+
+.gridList{
+
+    display:grid;
+
+    grid-template-columns:
+    repeat(2,1fr);
+
+    gap:10px;
+
+    margin-top:15px;
+}
+
+.item{
+
+    background:#222;
+
+    border:2px solid transparent;
+
+    border-radius:8px;
+
+    padding:12px;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    transition:.2s;
+}
+
+.item.selected{
+
+    background:#2a2a2a;
+
+    border-color:#00ff88;
+
+    transform:scale(1.03);
+}
+
+.swapCheck{
+
+    transform:scale(1.5);
+}
+
+/* =====================================
+   FORM
+===================================== */
+
+.modal input,
+.modal select{
+
+    width:100%;
+
+    box-sizing:border-box;
+
+    margin-top:10px;
+
+    padding:10px;
+
+    border:none;
+
+    border-radius:8px;
+
+    background:#222;
+
+    color:white;
+}
+
+.modalAction{
+
+    margin-top:12px;
+
+    border:none;
+
+    border-radius:8px;
+
+    padding:10px 12px;
+
+    background:#ff0000;
+
+    color:white;
+
+    font-weight:bold;
+}
+
+/* =====================================
+   LAYOUT MODAL
+===================================== */
+
+.layoutOption{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    margin-top:12px;
+
+    padding:10px;
+
+    border-radius:8px;
+
+    background:#222;
+}
+
+.layoutOption input{
+
+    width:auto;
+
+    margin:0;
+
+    transform:scale(1.4);
+}
+
+/* =====================================
+   LAYOUT 2
+   DESTAQUE DIREITO
+===================================== */
+
+.layout-right{
+
+    display:grid;
+
+    grid-template-columns:
+    3fr 1fr;
+
+    grid-template-rows:
+    repeat(3,1fr);
+
+    gap:2px;
+}
+
+/* =====================================
+   LAYOUT 3
+   DUPLO DESTAQUE
+===================================== */
+
+.layout-double{
+
+    display:grid;
+
+    grid-template-columns:
+    repeat(4,1fr);
+
+    grid-template-rows:
+    2fr 1fr;
+
+    gap:2px;
+}
+
+/* =====================================
+   LAYOUT 4
+   ROTATIVO
+===================================== */
+
+.layout-rotate{
+
+    display:grid;
+
+    grid-template-columns:
+    3fr 1fr;
+
+    gap:2px;
+}
+
+/* =====================================
+   HELPERS
+===================================== */
+
+.hidden{
+
+    display:none !important;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- =====================================
+     OVERLAY INTELIGENTE
+===================================== -->
+
+<div id="overlay">
+
+    <button
+        class="ctrlBtn"
+        onclick="openSwap()">
+        TROCAR
+    </button>
+
+    <button
+        class="ctrlBtn"
+        onclick="openReplace()">
+        SUBSTITUIR
+    </button>
+
+    <button
+        class="ctrlBtn"
+        onclick="openLayoutModal()">
+        LAYOUT
+    </button>
+
+</div>
+
+<!-- =====================================
+     CANVAS 16:9
+===================================== -->
+
+<div id="stage"></div>
+
+<!-- =====================================
+     MODAL TROCAR POSIÇÃO
+===================================== -->
+
+<div
+    id="swapModal"
+    class="modal">
+
+    <div class="modalContent">
+
+        <button
+            class="closeBtn"
+            onclick="closeSwap()">
+            ✕
+        </button>
+
+        <h2>
+            Trocar posição das lives
+        </h2>
+
+        <p>
+            Selecione duas lives
+        </p>
+
+        <div
+            id="swapList"
+            class="gridList">
+        </div>
+
+        <button
+            id="swapBtn"
+            class="modalAction"
+            onclick="confirmSwap()"
+            disabled>
+
+            TROCAR POSIÇÃO
+
+        </button>
+
+    </div>
+
+</div>
+
+<!-- =====================================
+     MODAL SUBSTITUIR LIVE
+===================================== -->
+
+<div
+    id="replaceModal"
+    class="modal">
+
+    <div class="modalContent">
+
+        <button
+            class="closeBtn"
+            onclick="closeReplace()">
+            ✕
+        </button>
+
+        <h2>
+            Substituir live
+        </h2>
+
+        <p>
+            Escolha a live
+        </p>
+
+        <select id="replaceSelect">
+        </select>
+
+        <input
+            id="replaceInput"
+            type="text"
+            placeholder="Cole aqui a nova URL">
+
+        <button
+            class="modalAction"
+            onclick="confirmReplace()">
+
+            SUBSTITUIR
+
+        </button>
+
+    </div>
+
+</div>
+
+<!-- =====================================
+     MODAL LAYOUT
+===================================== -->
+
+<div
+    id="layoutModal"
+    class="modal">
+
+    <div class="modalContent">
+
+        <button
+            class="closeBtn"
+            onclick="closeLayoutModal()">
+            ✕
+        </button>
+
+        <h2>
+            Layout de exibição
+        </h2>
+
+        <div class="layoutOption">
+
+            <input
+                type="radio"
+                name="layoutMode"
+                id="layout0"
+                value="default">
+
+            <label for="layout0">
+
+                Layout padrão
+
+            </label>
+
+        </div>
+
+        <div class="layoutOption">
+
+            <input
+                type="radio"
+                name="layoutMode"
+                id="layout1"
+                value="right">
+
+            <label for="layout1">
+
+                Uma live grande +
+                coluna lateral
+
+            </label>
+
+        </div>
+
+        <div class="layoutOption">
+
+            <input
+                type="radio"
+                name="layoutMode"
+                id="layout2"
+                value="double">
+
+            <label for="layout2">
+
+                Duas lives grandes +
+                inferiores menores
+
+            </label>
+
+        </div>
+
+        <div class="layoutOption">
+
+            <input
+                type="radio"
+                name="layoutMode"
+                id="layout3"
+                value="rotate">
+
+            <label for="layout3">
+
+                Destaque rotativo
+                automático
+
+            </label>
+
+        </div>
+
+        <button
+            class="modalAction"
+            onclick="applyLayoutMode()">
+
+            APLICAR
+
+        </button>
+
+    </div>
+
+</div>
+
+<!-- =====================================
+     SCRIPT
+===================================== -->
+
+<script>
+
+/* =====================================
+   DADOS
+===================================== */
+
+let videos =
+JSON.parse(
+localStorage.getItem("videos")
+|| "[]"
+);
+
+/* =====================================
+   LAYOUT SALVO
+===================================== */
+
+let currentLayout =
+localStorage.getItem("layoutMode")
+|| "default";
+
+/* =====================================
+   ROTATIVO
+===================================== */
+
+let featuredIndex = 0;
+
+let rotateTimer = null;
+
+/* =====================================
+   OVERLAY
+===================================== */
+
+let overlayTimer = null;
+
+let modalOpened = false;
+
+/* =====================================
+   SWAP
+===================================== */
+
+let swapSelected = [];
+
+/* =====================================
+   HELPERS
+===================================== */
+
+function showModal(id){
+
+    modalOpened = true;
+
+    document
+    .getElementById(id)
+    .style.display = "flex";
+}
+
+function hideModal(id){
+
+    modalOpened = false;
+
+    document
+    .getElementById(id)
+    .style.display = "none";
+}
+
+function saveLayout(){
+
+    localStorage.setItem(
+        "layoutMode",
+        currentLayout
+    );
+}
+
+function extractID(url){
+
+    if(!url)
+        return null;
+
+    let m =
+    url.match(
+    /(v=|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]+)/
+    );
+
+    return m
+    ? m[2]
+    : null;
+}
+
+/* =====================================
+   OVERLAY INTELIGENTE
+===================================== */
+
+function showOverlay(){
+
+    if(modalOpened)
+        return;
+
+    let overlay =
+    document.getElementById(
+        "overlay"
+    );
+
+    overlay.classList.add(
+        "show"
+    );
+
+    clearTimeout(
+        overlayTimer
+    );
+
+    overlayTimer =
+    setTimeout(()=>{
+
+        overlay.classList.remove(
+            "show"
+        );
+
+    },2500);
+}
+
+document.addEventListener(
+    "touchstart",
+    showOverlay,
+    {passive:true}
+);
+
+document.addEventListener(
+    "click",
+    showOverlay
+);
+/* =====================================
+   MODAL LAYOUT
+===================================== */
+
+function openLayoutModal(){
+
+    document
+    .querySelector(
+        `input[value="${currentLayout}"]`
+    )
+    .checked = true;
+
+    showModal("layoutModal");
+}
+
+function closeLayoutModal(){
+
+    hideModal("layoutModal");
+}
+
+function applyLayoutMode(){
+
+    let selected =
+    document.querySelector(
+        'input[name="layoutMode"]:checked'
+    );
+
+    if(!selected) return;
+
+    currentLayout =
+    selected.value;
+
+    saveLayout();
+
+    closeLayoutModal();
+
+    load();
+}
+
+/* =====================================
+   SWAP
+===================================== */
+
+function openSwap(){
+
+    let list =
+    document.getElementById(
+        "swapList"
+    );
+
+    list.innerHTML = "";
+
+    swapSelected = [];
+
+    videos.forEach((v,i)=>{
+
+        let item =
+        document.createElement("div");
+
+        item.className = "item";
+
+        item.innerHTML = `
+            <span>Live ${i+1}</span>
+            <input
+                class="swapCheck"
+                type="checkbox">
+        `;
+
+        let check =
+        item.querySelector(
+            ".swapCheck"
+        );
+
+        check.addEventListener(
+            "change",
+            ()=>toggleSwap(
+                i,
+                check,
+                item
+            )
+        );
+
+        list.appendChild(item);
+    });
+
+    document
+    .getElementById(
+        "swapBtn"
+    )
+    .disabled = true;
+
+    showModal("swapModal");
+}
+
+function closeSwap(){
+
+    hideModal("swapModal");
+}
+
+function toggleSwap(
+    index,
+    checkbox,
+    item
+){
+
+    if(checkbox.checked){
+
+        if(
+            swapSelected.length >= 2
+        ){
+
+            let old =
+            swapSelected.shift();
+
+            let checks =
+            document.querySelectorAll(
+                ".swapCheck"
+            );
+
+            let items =
+            document.querySelectorAll(
+                "#swapList .item"
+            );
+
+            checks[old].checked =
+            false;
+
+            items[old]
+            .classList
+            .remove(
+                "selected"
+            );
+        }
+
+        swapSelected.push(index);
+
+        item.classList.add(
+            "selected"
+        );
+
+    }else{
+
+        swapSelected =
+        swapSelected.filter(
+            x => x !== index
+        );
+
+        item.classList.remove(
+            "selected"
+        );
+    }
+
+    document
+    .getElementById(
+        "swapBtn"
+    )
+    .disabled =
+    swapSelected.length !== 2;
+}
+
+function confirmSwap(){
+
+    if(
+        swapSelected.length !== 2
+    ) return;
+
+    let a =
+    swapSelected[0];
+
+    let b =
+    swapSelected[1];
+
+    [
+        videos[a],
+        videos[b]
+    ] =
+    [
+        videos[b],
+        videos[a]
+    ];
+
+    localStorage.setItem(
+        "videos",
+        JSON.stringify(videos)
+    );
+
+    closeSwap();
+
+    load();
+}
+
+/* =====================================
+   REPLACE
+===================================== */
+
+function openReplace(){
+
+    let select =
+    document.getElementById(
+        "replaceSelect"
+    );
+
+    select.innerHTML = "";
+
+    videos.forEach((v,i)=>{
+
+        let option =
+        document.createElement(
+            "option"
+        );
+
+        option.value = i;
+
+        option.textContent =
+        "Live " + (i+1);
+
+        select.appendChild(
+            option
+        );
+    });
+
+    document
+    .getElementById(
+        "replaceInput"
+    )
+    .value = "";
+
+    showModal(
+        "replaceModal"
+    );
+}
+
+function closeReplace(){
+
+    hideModal(
+        "replaceModal"
+    );
+}
+
+function confirmReplace(){
+
+    let index =
+    Number(
+        document
+        .getElementById(
+            "replaceSelect"
+        )
+        .value
+    );
+
+    let url =
+    document
+    .getElementById(
+        "replaceInput"
+    )
+    .value
+    .trim();
+
+    if(!url) return;
+
+    videos[index] = url;
+
+    localStorage.setItem(
+        "videos",
+        JSON.stringify(videos)
+    );
+
+    closeReplace();
+
+    load();
+}
+
+/* =====================================
+   ROTATIVO
+===================================== */
+
+function startRotation(){
+
+    clearInterval(
+        rotateTimer
+    );
+
+    if(
+        currentLayout !==
+        "rotate"
+    ){
+        return;
+    }
+
+    rotateTimer =
+    setInterval(()=>{
+
+        featuredIndex++;
+
+        if(
+            featuredIndex >=
+            videos.length
+        ){
+            featuredIndex = 0;
+        }
+
+        load();
+
+    },180000);
+}
+
+/* =====================================
+   IFRAME
+===================================== */
+
+function createFrame(url){
+
+    let id =
+    extractID(url);
+
+    if(!id) return "";
+
+    return `
+    <iframe
+    src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&rel=0"
+    allow="autoplay; encrypted-media; fullscreen"
+    allowfullscreen>
+    </iframe>
+    `;
+}
+
+/* =====================================
+   LOAD
+===================================== */
+
+function load(){
+
+    clearInterval(
+        rotateTimer
+    );
+
+    let stage =
+    document.getElementById(
+        "stage"
+    );
+
+    stage.innerHTML = "";
+
+    stage.className = "";
+
+    let n =
+    Math.min(
+        videos.length,
+        6
+    );
+
+    if(n === 0){
+        return;
+    }
+
+    /* =====================
+       LAYOUT PADRÃO
+    ===================== */
+
+    if(
+        currentLayout ===
+        "default"
+    ){
+
+        let cols =
+        n <= 2 ? 2 :
+        n <= 4 ? 2 : 3;
+
+        let rows =
+        n <= 2 ? 1 : 2;
+
+        stage.style.gridTemplateColumns =
+        `repeat(${cols},1fr)`;
+
+        stage.style.gridTemplateRows =
+        `repeat(${rows},1fr)`;
+
+        videos
+        .slice(0,6)
+        .forEach(url=>{
+
+            let tile =
+            document.createElement(
+                "div"
+            );
+
+            tile.className =
+            "tile";
+
+            tile.innerHTML =
+            createFrame(url);
+
+            stage.appendChild(
+                tile
+            );
+        });
+    }
+
+    /* =====================
+       LAYOUT DIREITA
+    ===================== */
+
+    else if(
+        currentLayout ===
+        "right"
+    ){
+
+        stage.className =
+        "layout-right";
+
+        stage.style.gridTemplateColumns =
+        "3fr 1fr";
+
+        stage.style.gridTemplateRows =
+        "repeat(3,1fr)";
+
+        let big =
+        document.createElement(
+            "div"
+        );
+
+        big.className =
+        "tile";
+
+        big.style.gridRow =
+        "1 / span 3";
+
+        big.innerHTML =
+        createFrame(
+            videos[0]
+        );
+
+        stage.appendChild(big);
+
+        for(
+            let i=1;
+            i<Math.min(n,4);
+            i++
+        ){
+
+            let tile =
+            document.createElement(
+                "div"
+            );
+
+            tile.className =
+            "tile";
+
+            tile.innerHTML =
+            createFrame(
+                videos[i]
+            );
+
+            stage.appendChild(
+                tile
+            );
+        }
+    }
+
+    /* =====================
+       LAYOUT DUPLO
+    ===================== */
+
+    else if(
+        currentLayout ===
+        "double"
+    ){
+
+        stage.className =
+        "layout-double";
+
+        stage.style.gridTemplateColumns =
+        "repeat(4,1fr)";
+
+        stage.style.gridTemplateRows =
+        "2fr 1fr";
+
+        let big1 =
+        document.createElement("div");
+
+        big1.className =
+        "tile";
+
+        big1.style.gridColumn =
+        "1 / span 2";
+
+        big1.innerHTML =
+        createFrame(
+            videos[0]
+        );
+
+        stage.appendChild(
+            big1
+        );
+
+        if(videos[1]){
+
+            let big2 =
+            document.createElement(
+                "div"
+            );
+
+            big2.className =
+            "tile";
+
+            big2.style.gridColumn =
+            "3 / span 2";
+
+            big2.innerHTML =
+            createFrame(
+                videos[1]
+            );
+
+            stage.appendChild(
+                big2
+            );
+        }
+
+        for(
+            let i=2;
+            i<n;
+            i++
+        ){
+
+            let tile =
+            document.createElement(
+                "div"
+            );
+
+            tile.className =
+            "tile";
+
+            tile.innerHTML =
+            createFrame(
+                videos[i]
+            );
+
+            stage.appendChild(
+                tile
+            );
+        }
+            }/* =====================
+       LAYOUT ROTATIVO
+    ===================== */
+
+    else if(
+        currentLayout ===
+        "rotate"
+    ){
+
+        stage.className =
+        "layout-rotate";
+
+        stage.style.gridTemplateColumns =
+        "3fr 1fr";
+
+        stage.style.gridTemplateRows =
+        "1fr";
+
+        let mainVideo =
+        videos[
+            featuredIndex %
+            videos.length
+        ];
+
+        let sideVideos =
+        videos.filter(
+            (v,i)=>
+            i !== (
+                featuredIndex %
+                videos.length
+            )
+        );
+
+        let big =
+        document.createElement(
+            "div"
+        );
+
+        big.className =
+        "tile";
+
+        big.innerHTML =
+        createFrame(
+            mainVideo
+        );
+
+        stage.appendChild(
+            big
+        );
+
+        let side =
+        document.createElement(
+            "div"
+        );
+
+        side.style.display =
+        "grid";
+
+        side.style.gridTemplateRows =
+        `repeat(${Math.max(sideVideos.length,1)},1fr)`;
+
+        side.style.gap =
+        "2px";
+
+        sideVideos.forEach(url=>{
+
+            let tile =
+            document.createElement(
+                "div"
+            );
+
+            tile.className =
+            "tile";
+
+            tile.innerHTML =
+            createFrame(url);
+
+            side.appendChild(
+                tile
+            );
+        });
+
+        stage.appendChild(
+            side
+        );
+
+        startRotation();
+    }
+}
+
+/* =====================================
+   FECHAR MODAIS AO TOCAR FORA
+===================================== */
+
+document
+.querySelectorAll(".modal")
+.forEach(modal=>{
+
+    modal.addEventListener(
+        "click",
+        e=>{
+
+            if(
+                e.target === modal
+            ){
+
+                modal.style.display =
+                "none";
+
+                modalOpened =
+                false;
+            }
+        }
+    );
+});
+
+/* =====================================
+   VOLTA OVERLAY AO FECHAR MODAL
+===================================== */
+
+const oldHideModal =
+hideModal;
+
+hideModal =
+function(id){
+
+    oldHideModal(id);
+
+    setTimeout(
+        showOverlay,
+        200
+    );
+};
+
+/* =====================================
+   REDIMENSIONAMENTO
+===================================== */
+
+window.addEventListener(
+    "resize",
+    ()=>{
+        load();
+    }
+);
+
+/* =====================================
+   VISIBILIDADE
+===================================== */
+
+document.addEventListener(
+    "visibilitychange",
+    ()=>{
+
+        if(
+            document.hidden
+        ){
+
+            clearInterval(
+                rotateTimer
+            );
+
+        }else{
+
+            if(
+                currentLayout ===
+                "rotate"
+            ){
+
+                startRotation();
+            }
+        }
+    }
+);
+
+/* =====================================
+   START
+===================================== */
+
+showOverlay();
+
+load();
+
+</script>
+
+</body>
 </html>
