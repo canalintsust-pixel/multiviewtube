@@ -1,27 +1,28 @@
-<!DOCTYPE html><html lang="pt-br"><head>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>MultiViewTube</title><style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mosaic Live</title>
+
+<style>
 
 html,
 body{
     margin:0;
-    padding:0;
     width:100%;
     height:100%;
-    overflow:hidden;
     background:#000;
-    font-family:Arial,sans-serif;
+    overflow:hidden;
 }
-
-/* =========================
-   CANVAS 16:9
-========================= */
 
 body{
     display:flex;
     justify-content:center;
     align-items:center;
 }
+
+/* ================= CANVAS 16:9 ================= */
 
 #canvas{
     position:relative;
@@ -35,9 +36,10 @@ body{
     background:#000;
 
     display:grid;
-
-    overflow:hidden;
+    gap:0;
 }
+
+/* ================= CELLS ================= */
 
 .cell{
     position:relative;
@@ -45,175 +47,140 @@ body{
     background:#000;
 }
 
-.cell.selected{
-    outline:3px solid lime;
-}
-
 iframe{
     width:100%;
     height:100%;
-    border:none;
+    border:0;
 }
 
-/* =========================
-   STATUS
-========================= */
+/* ================= STATUS ================= */
 
 #status{
-    position:fixed;
-
+    position:absolute;
     top:10px;
     left:10px;
 
-    z-index:1000;
-
-    color:#fff;
+    color:#aaa;
+    font-family:Arial;
     font-size:12px;
 
-    background:rgba(0,0,0,.6);
-
-    padding:6px 10px;
-    border-radius:6px;
+    z-index:100;
 }
 
-/* =========================
-   OVERLAY
-========================= */
+/* ================= OVERLAY ================= */
 
 #overlay{
-    position:fixed;
-
+    position:absolute;
     inset:0;
-
-    display:none;
-
-    justify-content:center;
-    align-items:center;
-    flex-direction:column;
-
-    gap:12px;
 
     background:rgba(0,0,0,.65);
 
-    z-index:1500;
+    display:none;
+
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+
+    gap:12px;
+
+    z-index:999;
 }
 
 .btn{
     min-width:220px;
 
-    padding:14px;
+    padding:12px 18px;
 
-    border:none;
+    background:#222;
+    color:#fff;
 
+    border:1px solid #444;
     border-radius:8px;
 
     cursor:pointer;
 
-    color:white;
-
-    background:#222;
+    font-family:Arial;
+    text-align:center;
 }
 
 .btn:hover{
     background:#333;
 }
 
-/* =========================
-   MODAIS
-========================= */
+/* ================= MODAIS ================= */
 
 .modal{
     position:fixed;
-
     inset:0;
+
+    background:rgba(0,0,0,.85);
 
     display:none;
 
     justify-content:center;
     align-items:center;
 
-    background:rgba(0,0,0,.85);
-
-    z-index:2000;
+    z-index:3000;
 }
 
 .modalBox{
-
     width:90%;
     max-width:450px;
 
     background:#111;
 
-    border-radius:10px;
-
     padding:20px;
 
+    border-radius:10px;
+
     color:white;
+
+    font-family:Arial;
 }
 
 .modalHeader{
-
     display:flex;
-
     justify-content:space-between;
-
     align-items:center;
 
     margin-bottom:15px;
 }
 
-.closeBtn{
-
+.modalHeader button{
     background:none;
     border:none;
-
     color:white;
-
     cursor:pointer;
-
     font-size:18px;
 }
 
-.modalList{
-
-    max-height:300px;
-
-    overflow:auto;
-
-    margin-bottom:15px;
-}
-
 .modalItem{
-
     padding:10px;
+    margin-bottom:8px;
 
-    margin-bottom:6px;
-
-    background:#222;
-
+    border:1px solid #333;
     border-radius:6px;
-}
-
-.modalItem.selected{
-
-    outline:2px solid lime;
-}
-
-.modalAction{
-
-    width:100%;
-
-    margin-top:10px;
-
-    padding:12px;
 
     cursor:pointer;
 }
 
-#replaceUrl{
+.modalItem.selected{
+    border-color:lime;
+    background:#163216;
+}
+
+.modalAction{
+    margin-top:15px;
 
     width:100%;
 
+    padding:10px;
+
+    cursor:pointer;
+}
+
+#newUrl{
+    width:100%;
     box-sizing:border-box;
 
     padding:10px;
@@ -221,141 +188,110 @@ iframe{
     margin-top:10px;
 }
 
-/* =========================
-   ATUALIZAÇÃO
-========================= */
+</style>
+</head>
 
-#updateModal{
+<body>
 
-    position:fixed;
+<div id="canvas"></div>
 
-    inset:0;
-
-    display:none;
-
-    justify-content:center;
-    align-items:center;
-
-    background:rgba(0,0,0,.8);
-
-    z-index:2500;
-}
-
-#updateBox{
-
-    background:#111;
-
-    padding:20px;
-
-    border-radius:10px;
-
-    color:white;
-
-    min-width:280px;
-}
-
-</style></head><body><div id="canvas"></div><div id="status">
+<div id="status">
 Carregando...
-</div><!-- =====================
-OVERLAY
-===================== --><div id="overlay"><button class="btn" onclick="openSwapModal()">
-TROCAR
-</button><button class="btn" onclick="openReplaceModal()">
-SUBSTITUIR
-</button><button class="btn" onclick="openLayoutModal()">
-LAYOUT
-</button><button class="btn" onclick="forceUpdate()">
-ATUALIZAR TODAS
-</button><button class="btn" onclick="goBack()">
-VOLTAR
-</button></div><!-- =====================
-MODAL TROCAR
-===================== --><div id="swapModal" class="modal"><div class="modalBox"><div class="modalHeader"><span>Trocar posições</span>
+</div>
 
-<button
-class="closeBtn"
-onclick="closeSwapModal()">
-X
-</button>
+<!-- ================= OVERLAY ================= -->
 
-</div><div
-id="swapList"
-class="modalList">
-</div><button
-class="modalAction"
-onclick="confirmSwap()">
-TROCAR POSIÇÃO
-</button>
+<div id="overlay">
 
-</div></div><!-- =====================
-MODAL SUBSTITUIR
-===================== --><div id="replaceModal" class="modal"><div class="modalBox"><div class="modalHeader"><span>Substituir live</span>
+    <div class="btn" onclick="openSwapModal()">
+        TROCAR
+    </div>
 
-<button
-class="closeBtn"
-onclick="closeReplaceModal()">
-X
-</button>
+    <div class="btn" onclick="openReplaceModal()">
+        SUBSTITUIR
+    </div>
 
-</div><div
-id="replaceList"
-class="modalList">
-</div><input
-id="replaceUrl"
-type="text"
-placeholder="Cole URL do YouTube">
+    <div class="btn" onclick="cycleLayout()">
+        LAYOUT
+    </div>
 
-<button
-class="modalAction"
-onclick="confirmReplace()">
-SUBSTITUIR
-</button>
+    <div class="btn" onclick="forceUpdate()">
+        ATUALIZAR TODAS
+    </div>
 
-</div></div><!-- =====================
-MODAL LAYOUT
-===================== --><div id="layoutModal" class="modal"><div class="modalBox"><div class="modalHeader"><span>Escolher layout</span>
+    <div class="btn" onclick="goBack()">
+        VOLTAR
+    </div>
 
-<button
-class="closeBtn"
-onclick="closeLayoutModal()">
-X
-</button>
+</div>
 
-</div><div class="modalList"><div class="modalItem">
-<label>
-<input type="radio" name="layout" value="default" checked>
-Layout padrão
-</label>
-</div><div class="modalItem">
-<label>
-<input type="radio" name="layout" value="sidebar">
-Destaque lateral
-</label>
-</div><div class="modalItem">
-<label>
-<input type="radio" name="layout" value="double">
-Duplo destaque
-</label>
-</div><div class="modalItem">
-<label>
-<input type="radio" name="layout" value="rotative">
-Destaque rotativo
-</label>
-</div></div><button
-class="modalAction"
-onclick="applySelectedLayout()">
-APLICAR
-</button>
+<!-- ================= MODAL TROCAR ================= -->
 
-</div></div><!-- =====================
-MODAL UPDATE
-===================== --><div id="updateModal"><div id="updateBox"><div id="updateContent">
-Atualizando...
-</div></div></div>
+<div id="swapModal" class="modal">
+
+    <div class="modalBox">
+
+        <div class="modalHeader">
+
+            <span>TROCAR POSIÇÕES</span>
+
+            <button onclick="closeSwapModal()">
+                X
+            </button>
+
+        </div>
+
+        <div id="swapList"></div>
+
+        <button
+            class="modalAction"
+            onclick="confirmSwap()">
+
+            TROCAR POSIÇÃO
+
+        </button>
+
+    </div>
+
+</div>
+
+<!-- ================= MODAL SUBSTITUIR ================= -->
+
+<div id="replaceModal" class="modal">
+
+    <div class="modalBox">
+
+        <div class="modalHeader">
+
+            <span>SUBSTITUIR LIVE</span>
+
+            <button onclick="closeReplaceModal()">
+                X
+            </button>
+
+        </div>
+
+        <div id="replaceList"></div>
+
+        <input
+            id="newUrl"
+            placeholder="Cole URL do YouTube">
+
+        <button
+            class="modalAction"
+            onclick="confirmReplace()">
+
+            SUBSTITUIR
+
+        </button>
+
+    </div>
+
+</div>
+
 <script>
 
-const WORKER_URL =
-"https://polished-smoke-6d50.canalintsust.workers.dev/";
+/* ================= ELEMENTOS ================= */
 
 const canvas =
 document.getElementById("canvas");
@@ -366,187 +302,54 @@ document.getElementById("overlay");
 const status =
 document.getElementById("status");
 
-const selectedChannels =
+const swapModal =
+document.getElementById("swapModal");
+
+const replaceModal =
+document.getElementById("replaceModal");
+
+/* ================= CONFIG ================= */
+
+const WORKER_URL =
+"https://polished-smoke-6d50.canalintsust.workers.dev/";
+
+const selected =
 JSON.parse(
-localStorage.getItem("selectedChannels") || "[]"
+localStorage.getItem("selectedChannels")
+|| "[]"
 );
+
+/* ================= STATE ================= */
 
 let state = [];
 
 let overlayTimer = null;
 
+let layoutMode = 0;
+
 let swapSelection = [];
 
-let replaceSelection = null;
+let replaceIndex = null;
 
-let currentLayout =
-localStorage.getItem("layoutMode")
-|| "default";
+/* ================= GRID ================= */
 
-let rotativeIndex = 0;
-
-/* =========================
-EMBED
-========================= */
-
-function embedUrl(videoId){
-
-    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
-}
-
-/* =========================
-GRID
-========================= */
-
-function setGrid(cols,rows){
+function setGrid(cols, rows){
 
     canvas.style.gridTemplateColumns =
     `repeat(${cols},1fr)`;
 
     canvas.style.gridTemplateRows =
-    `repeat(${rows},1fr)`;
+    `repeat(${rows},1fr`;
 }
 
-/* =========================
-RENDER
-========================= */
+/* ================= EMBED ================= */
 
-function render(){
+function buildEmbed(videoId){
 
-    canvas.innerHTML = "";
-
-    if(currentLayout === "default"){
-        renderDefault();
-        return;
-    }
-
-    if(currentLayout === "sidebar"){
-        renderSidebar();
-        return;
-    }
-
-    if(currentLayout === "double"){
-        renderDouble();
-        return;
-    }
-
-    if(currentLayout === "rotative"){
-        renderRotative();
-        return;
-    }
+    return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0`;
 }
 
-/* =========================
-LAYOUT PADRÃO
-========================= */
-
-function renderDefault(){
-
-    const n = state.length;
-
-    if(n===1) setGrid(1,1);
-    else if(n===2) setGrid(2,1);
-    else if(n<=4) setGrid(2,2);
-    else setGrid(3,2);
-
-    state.forEach(addCell);
-}
-
-/* =========================
-SIDEBAR
-========================= */
-
-function renderSidebar(){
-
-    if(state.length < 2){
-        renderDefault();
-        return;
-    }
-
-    canvas.style.display = "grid";
-
-    canvas.style.gridTemplateColumns =
-    "2fr 1fr";
-
-    canvas.style.gridTemplateRows =
-    `repeat(${state.length-1},1fr)`;
-
-    const big = createCell(state[0],0);
-
-    big.style.gridRow =
-    `1 / span ${state.length-1}`;
-
-    canvas.appendChild(big);
-
-    state.slice(1).forEach((item,i)=>{
-
-        const cell =
-        createCell(item,i+1);
-
-        canvas.appendChild(cell);
-    });
-}
-
-/* =========================
-DOUBLE
-========================= */
-
-function renderDouble(){
-
-    if(state.length < 3){
-        renderDefault();
-        return;
-    }
-
-    setGrid(2,2);
-
-    state.forEach(addCell);
-}
-
-/* =========================
-ROTATIVE
-========================= */
-
-function renderRotative(){
-
-    if(state.length < 2){
-        renderDefault();
-        return;
-    }
-
-    const copy =
-    [...state];
-
-    const highlighted =
-    copy.splice(rotativeIndex,1)[0];
-
-    copy.unshift(highlighted);
-
-    canvas.style.gridTemplateColumns =
-    "2fr 1fr";
-
-    canvas.style.gridTemplateRows =
-    `repeat(${copy.length-1},1fr)`;
-
-    const big =
-    createCell(copy[0],0);
-
-    big.style.gridRow =
-    `1 / span ${copy.length-1}`;
-
-    canvas.appendChild(big);
-
-    copy.slice(1).forEach((item,i)=>{
-
-        canvas.appendChild(
-            createCell(item,i+1)
-        );
-    });
-}
-
-/* =========================
-CELL
-========================= */
+/* ================= CELL ================= */
 
 function createCell(item,index){
 
@@ -561,30 +364,111 @@ function createCell(item,index){
     document.createElement("iframe");
 
     iframe.src =
-    embedUrl(item.videoId);
+    buildEmbed(item.videoId);
 
     div.appendChild(iframe);
 
     return div;
 }
 
-function addCell(item,index){
+/* ================= UPDATE CELL ================= */
 
-    canvas.appendChild(
-        createCell(item,index)
+function updateCell(index,newId){
+
+    const cell =
+    canvas.querySelector(
+        `[data-index="${index}"]`
+    );
+
+    if(!cell) return;
+
+    const iframe =
+    cell.querySelector("iframe");
+
+    const expected =
+    buildEmbed(newId);
+
+    if(iframe.src === expected)
+        return;
+
+    iframe.src = expected;
+}
+
+/* ================= LAYOUT ================= */
+
+function applyLayout(total){
+
+    if(total === 1){
+
+        setGrid(1,1);
+    }
+
+    else if(total === 2){
+
+        setGrid(2,1);
+    }
+
+    else if(total <= 4){
+
+        setGrid(2,2);
+    }
+
+    else{
+
+        setGrid(3,2);
+    }
+}
+
+/* ================= RENDER ================= */
+
+function render(){
+
+    canvas.innerHTML = "";
+
+    applyLayout(state.length);
+
+    state.forEach((item,index)=>{
+
+        canvas.appendChild(
+            createCell(item,index)
+        );
+
+    });
+}
+
+/* ================= OVERLAY ================= */
+
+function hideOverlay(){
+
+    overlay.style.display = "none";
+}
+
+function showOverlay(){
+
+    overlay.style.display = "flex";
+
+    clearTimeout(overlayTimer);
+
+    overlayTimer =
+    setTimeout(
+        hideOverlay,
+        2500
     );
 }
 
-/* =========================
-SWAP
-========================= */
+function goBack(){
+
+    window.location.href =
+    "index.html";
+}
+
+/* ================= MODAL TROCAR ================= */
 
 function openSwapModal(){
 
-    swapSelection = [];
+    hideOverlay();
 
-    const modal =
-    document.getElementById("swapModal");
+    swapSelection = [];
 
     const list =
     document.getElementById("swapList");
@@ -599,77 +483,75 @@ function openSwapModal(){
         div.className =
         "modalItem";
 
-        div.innerHTML = `
-        <label>
-        <input type="checkbox">
-        ${item.channel}
-        </label>
-        `;
+        div.textContent =
+        `Live ${index + 1} (${item.channel})`;
 
         div.onclick = ()=>{
 
-            if(swapSelection.includes(index)){
+            if(
+                swapSelection.includes(index)
+            ){
 
                 swapSelection =
                 swapSelection.filter(
-                x=>x!==index
+                    v => v !== index
                 );
 
                 div.classList.remove(
-                "selected"
+                    "selected"
                 );
 
                 return;
             }
 
             if(
-              swapSelection.length>=2
+                swapSelection.length >= 2
             ){
-              return;
+                return;
             }
 
             swapSelection.push(index);
 
             div.classList.add(
-            "selected"
+                "selected"
             );
         };
 
         list.appendChild(div);
+
     });
 
-    modal.style.display="flex";
+    swapModal.style.display =
+    "flex";
 }
 
 function closeSwapModal(){
 
-    document
-    .getElementById("swapModal")
-    .style.display="none";
+    swapSelection = [];
+
+    swapModal.style.display =
+    "none";
 }
+    /* ================= CONFIRM SWAP ================= */
 
 function confirmSwap(){
 
-    if(
-      swapSelection.length!==2
-    ){
+    if(swapSelection.length !== 2){
+
         alert(
-        "Selecione 2 lives"
+            "Selecione exatamente 2 lives"
         );
+
         return;
     }
 
-    const [a,b] =
-    swapSelection;
+    const [a,b] = swapSelection;
 
-    const temp =
-    state[a];
+    const temp = state[a];
 
-    state[a] =
-    state[b];
+    state[a] = state[b];
 
-    state[b] =
-    temp;
+    state[b] = temp;
 
     saveState();
 
@@ -678,22 +560,21 @@ function confirmSwap(){
     closeSwapModal();
 }
 
-/* =========================
-REPLACE
-========================= */
+/* ================= MODAL SUBSTITUIR ================= */
 
 function openReplaceModal(){
 
-    replaceSelection = null;
+    hideOverlay();
 
-    const modal =
+    replaceIndex = null;
+
     document.getElementById(
-    "replaceModal"
-    );
+        "newUrl"
+    ).value = "";
 
     const list =
     document.getElementById(
-    "replaceList"
+        "replaceList"
     );
 
     list.innerHTML = "";
@@ -707,309 +588,339 @@ function openReplaceModal(){
         "modalItem";
 
         div.textContent =
-        item.channel;
+        `Live ${index + 1} (${item.channel})`;
 
         div.onclick = ()=>{
 
-            replaceSelection =
-            index;
+            replaceIndex = index;
 
             [...list.children]
-            .forEach(x=>
-                x.classList.remove(
-                "selected"
-                )
-            );
+            .forEach(el=>{
+
+                el.classList.remove(
+                    "selected"
+                );
+
+            });
 
             div.classList.add(
-            "selected"
+                "selected"
             );
         };
 
         list.appendChild(div);
     });
 
-    modal.style.display="flex";
+    replaceModal.style.display =
+    "flex";
 }
 
 function closeReplaceModal(){
 
-    document
-    .getElementById(
-    "replaceModal"
-    )
-    .style.display="none";
+    replaceIndex = null;
+
+    document.getElementById(
+        "newUrl"
+    ).value = "";
+
+    replaceModal.style.display =
+    "none";
 }
 
 function confirmReplace(){
 
-    if(
-      replaceSelection===null
-    ) return;
+    if(replaceIndex === null){
 
-    const url =
-    document.getElementById(
-    "replaceUrl"
-    ).value;
+        alert(
+            "Selecione uma live"
+        );
 
-    const match =
-    url.match(
-    /([a-zA-Z0-9_-]{11})/
-    );
-
-    if(!match){
-        alert("URL inválida");
         return;
     }
 
-    state[
-      replaceSelection
-    ].videoId =
+    const url =
+    document.getElementById(
+        "newUrl"
+    ).value.trim();
+
+    if(!url){
+
+        alert(
+            "Informe uma URL"
+        );
+
+        return;
+    }
+
+    const match =
+    url.match(
+        /([a-zA-Z0-9_-]{11})/
+    );
+
+    if(!match){
+
+        alert(
+            "Vídeo inválido"
+        );
+
+        return;
+    }
+
+    const videoId =
     match[1];
+
+    state[replaceIndex].videoId =
+    videoId;
 
     saveState();
 
-    render();
+    updateCell(
+        replaceIndex,
+        videoId
+    );
 
     closeReplaceModal();
 }
 
-/* =========================
-LAYOUT
-========================= */
+/* ================= LAYOUT ================= */
 
-function openLayoutModal(){
+function cycleLayout(){
 
-    document
-    .getElementById(
-    "layoutModal"
-    )
-    .style.display="flex";
+    layoutMode++;
+
+    if(layoutMode > 2)
+        layoutMode = 0;
+
+    if(layoutMode === 0){
+
+        applyLayout(
+            state.length
+        );
+    }
+
+    if(layoutMode === 1){
+
+        setGrid(2,2);
+    }
+
+    if(layoutMode === 2){
+
+        setGrid(3,2);
+    }
 }
 
-function closeLayoutModal(){
-
-    document
-    .getElementById(
-    "layoutModal"
-    )
-    .style.display="none";
-}
-
-function applySelectedLayout(){
-
-    const radio =
-    document.querySelector(
-    'input[name="layout"]:checked'
-    );
-
-    currentLayout =
-    radio.value;
-
-    localStorage.setItem(
-    "layoutMode",
-    currentLayout
-    );
-
-    render();
-
-    closeLayoutModal();
-}
-
-/* =========================
-UPDATE
-========================= */
+/* ================= UPDATE ================= */
 
 async function forceUpdate(){
 
-    const updateModal =
-    document.getElementById(
-    "updateModal"
-    );
+    try{
 
-    const content =
-    document.getElementById(
-    "updateContent"
-    );
+        status.textContent =
+        "Atualizando...";
 
-    updateModal.style.display =
-    "flex";
+        const response =
+        await fetch(
+            `${WORKER_URL}?channels=${selected.join(",")}`
+        );
 
-    content.innerHTML =
-    "Atualizando canais...<br><br>";
+        const data =
+        await response.json();
 
-    const res =
-    await fetch(
-    `${WORKER_URL}?channels=${selectedChannels.join(",")}`
-    );
+        state.forEach(
+            (item,index)=>{
 
-    const data =
-    await res.json();
+            const newId =
+            data[item.channel];
 
-    state.forEach((item)=>{
+            if(
+                !newId ||
+                newId === item.videoId
+            ){
+                return;
+            }
 
-        const newId =
-        data[item.channel];
-
-        if(
-          newId &&
-          newId!==item.videoId
-        ){
             item.videoId =
             newId;
-        }
 
-        content.innerHTML +=
-        `${item.channel} ✓<br>`;
-    });
+            updateCell(
+                index,
+                newId
+            );
 
-    saveState();
+        });
 
-    render();
+        saveState();
 
-    setTimeout(()=>{
+        status.textContent =
+        "AO VIVO";
 
-        updateModal.style.display =
-        "none";
+    }
+    catch(error){
 
-    },1500);
+        console.error(error);
+
+        status.textContent =
+        "Erro de atualização";
+    }
 }
 
-/* =========================
-SAVE
-========================= */
+/* ================= STORAGE ================= */
 
 function saveState(){
 
     localStorage.setItem(
-    "mosaicState",
-    JSON.stringify(state)
+        "mosaicState",
+        JSON.stringify(state)
     );
 }
 
-/* =========================
-BACK
-========================= */
-
-function goBack(){
-
-    window.location.href =
-    "index.html";
-}
-
-/* =========================
-LOAD
-========================= */
+/* ================= INIT ================= */
 
 async function init(){
 
-    status.textContent =
-    "Carregando...";
+    try{
 
-    const res =
-    await fetch(
-    `${WORKER_URL}?channels=${selectedChannels.join(",")}`
-    );
+        const saved =
+        localStorage.getItem(
+            "mosaicState"
+        );
 
-    const data =
-    await res.json();
+        if(saved){
 
-    state =
-    Object.keys(data)
-    .filter(ch=>data[ch])
-    .map(ch=>({
+            state =
+            JSON.parse(saved);
 
-        channel:ch,
+            render();
 
-        videoId:data[ch]
+            status.textContent =
+            "AO VIVO";
 
-    }));
+            return;
+        }
 
-    saveState();
+        status.textContent =
+        "Carregando...";
 
-    render();
+        const response =
+        await fetch(
+            `${WORKER_URL}?channels=${selected.join(",")}`
+        );
 
-    status.textContent =
-    "AO VIVO";
+        const data =
+        await response.json();
+
+        state =
+        Object.keys(data)
+        .filter(
+            ch => data[ch]
+        )
+        .map(ch=>({
+
+            channel: ch,
+
+            videoId:
+            data[ch]
+
+        }));
+
+        saveState();
+
+        render();
+
+        status.textContent =
+        "AO VIVO";
+    }
+    catch(error){
+
+        console.error(error);
+
+        status.textContent =
+        "Falha ao carregar";
+    }
 }
 
-/* =========================
-OVERLAY
-========================= */
+/* ================= CLICK GLOBAL ================= */
 
-function showOverlay(){
-
-    overlay.style.display =
-    "flex";
-
-    clearTimeout(
-    overlayTimer
-    );
-
-    overlayTimer =
-    setTimeout(()=>{
-
-        overlay.style.display =
-        "none";
-
-    },2500);
-}
-
-document.body
-.addEventListener(
-"click",
-(e)=>{
+document.body.addEventListener(
+    "click",
+    (e)=>{
 
     if(
-      e.target.closest(".modal")
-    ) return;
+        e.target.closest(".modalBox")
+    ){
+        return;
+    }
 
     if(
-      e.target.closest(".btn")
-    ) return;
+        swapModal.style.display ===
+        "flex"
+    ){
+        return;
+    }
+
+    if(
+        replaceModal.style.display ===
+        "flex"
+    ){
+        return;
+    }
+
+    if(
+        e.target.closest("iframe")
+    ){
+        return;
+    }
+
+    if(
+        e.target.classList.contains(
+            "btn"
+        )
+    ){
+        return;
+    }
 
     showOverlay();
 });
 
-/* =========================
-ROTATIVE LOOP
-========================= */
+/* ================= EXPORTS ================= */
 
-setInterval(()=>{
+window.openSwapModal =
+openSwapModal;
 
-    if(
-      currentLayout!==
-      "rotative"
-    ) return;
+window.closeSwapModal =
+closeSwapModal;
 
-    if(
-      state.length<2
-    ) return;
+window.confirmSwap =
+confirmSwap;
 
-    rotativeIndex++;
+window.openReplaceModal =
+openReplaceModal;
 
-    if(
-      rotativeIndex>=
-      state.length
-    ){
-      rotativeIndex=0;
-    }
+window.closeReplaceModal =
+closeReplaceModal;
 
-    render();
+window.confirmReplace =
+confirmReplace;
 
-},180000);
+window.cycleLayout =
+cycleLayout;
 
-/* =========================
-START
-========================= */
+window.forceUpdate =
+forceUpdate;
+
+window.goBack =
+goBack;
+
+/* ================= START ================= */
 
 init();
 
 setInterval(
-forceUpdate,
-60000
+    forceUpdate,
+    60000
 );
 
 </script>
+
 </body>
 </html>
