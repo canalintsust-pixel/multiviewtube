@@ -10,6 +10,7 @@
       margin: 0;
       height: 100%;
       background: black;
+      gap: 2px;
       overflow: hidden;
     }
 
@@ -51,6 +52,32 @@
       font-size: 12px;
       z-index: 10;
     }
+          #overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+#overlayPanel {
+  display: flex;
+  gap: 10px;
+  background: rgba(20,20,20,0.9);
+  padding: 14px;
+  border-radius: 10px;
+}
+
+#overlayPanel button {
+  background: #222;
+  color: white;
+  border: 1px solid #333;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-weight: bold;
+}
   </style>
 </head>
 
@@ -58,7 +85,17 @@
 
 <div id="canvas"></div>
 <div id="status">Carregando lives...</div>
+<div id="overlay">
+  <div id="overlayPanel">
 
+    <button onclick="alert('TROCAR (Passo 8)')">TROCAR</button>
+    <button onclick="alert('SUBSTITUIR (Passo 8)')">SUBSTITUIR</button>
+    <button onclick="alert('LAYOUT (já existe no sistema)')">LAYOUT</button>
+    <button onclick="load()">ATUALIZAR TODAS</button>
+
+  </div>
+</div>
+        
 <script>
 const canvas = document.getElementById("canvas");
 const status = document.getElementById("status");
@@ -192,6 +229,40 @@ async function load() {
 
 load();
 setInterval(load, 60000);
+
+        const overlay = document.getElementById("overlay");
+
+let overlayTimer = null;
+
+/* -------------------------
+   MOSTRAR OVERLAY
+-------------------------- */
+function showOverlay() {
+  overlay.style.display = "flex";
+
+  clearTimeout(overlayTimer);
+
+  overlayTimer = setTimeout(() => {
+    hideOverlay();
+  }, 2500);
+}
+
+/* -------------------------
+   OCULTAR OVERLAY
+-------------------------- */
+function hideOverlay() {
+  overlay.style.display = "none";
+}
+
+/* -------------------------
+   TOQUE NA TELA → OVERLAY
+-------------------------- */
+document.addEventListener("click", (e) => {
+  // evita clique dentro dos botões do overlay resetar loop
+  if (e.target.closest("#overlayPanel")) return;
+
+  showOverlay();
+});
 </script>
 
 </body>
