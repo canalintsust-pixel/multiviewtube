@@ -61,10 +61,17 @@ body{
 }
 
 iframe{
+    position:absolute;
+    top:0;
+    left:0;
+
     width:100%;
     height:100%;
+
     border:none;
     background:#000;
+
+    pointer-events:auto;
 }
 
 /* =====================================================
@@ -72,7 +79,7 @@ iframe{
 ===================================================== */
 
 #overlay{
-    position:absolute;   /* FIX para TV Box */
+    position:fixed;
     inset:0;
 
     display:none;
@@ -118,7 +125,7 @@ iframe{
 ===================================================== */
 
 .modal-backdrop{
-    position:absolute;
+    position:fixed;
 
     inset:0;
 
@@ -949,7 +956,19 @@ function updateCell(
     }
 
     iframe.src =
-    buildEmbed(videoId);
+buildEmbed(item.videoId);
+
+iframe.allow =
+"autoplay; encrypted-media; fullscreen";
+
+iframe.setAttribute("playsinline", "1");
+
+iframe.setAttribute("allowfullscreen", "1");
+
+iframe.setAttribute(
+"referrerpolicy",
+"origin"
+);
 
 }
 
