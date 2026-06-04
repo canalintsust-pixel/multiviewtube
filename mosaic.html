@@ -529,7 +529,7 @@ function setGrid(columns,rows){
     `repeat(${columns},1fr)`;
 
     canvas.style.gridTemplateRows =
-    `repeat(${rows},1fr`);
+`repeat(${rows},1fr)`;
 
 }
 
@@ -1095,31 +1095,32 @@ function closeOverlay(){
    CLIQUE NA TELA
 ===================================================== */
 
-["click","touchstart","pointerdown"].forEach(evt => {
-document.addEventListener(evt, (e)=>{
+document.addEventListener(
+    "click",
+    (e)=>{
 
-    if(
-        e.target.closest(".overlay-btn")
-    ){
-        return;
+        if(
+            e.target.closest(".overlay-btn")
+        ){
+            return;
+        }
+
+        if(
+            e.target.closest(".modal")
+        ){
+            return;
+        }
+
+        if(
+            e.target === backBtn
+        ){
+            return;
+        }
+
+        showOverlay();
+
     }
-
-    if(
-        e.target.closest(".modal")
-    ){
-        return;
-    }
-
-    if(
-        e.target === backBtn
-    ){
-        return;
-    }
-
-    showOverlay();
-
-}, { passive:true });
-});
+);
 
 /* =====================================================
    BOTÃO VOLTAR
