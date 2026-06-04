@@ -61,17 +61,10 @@ body{
 }
 
 iframe{
-    position:absolute;
-    top:0;
-    left:0;
-
     width:100%;
     height:100%;
-
     border:none;
     background:#000;
-
-    pointer-events:auto;
 }
 
 /* =====================================================
@@ -536,7 +529,7 @@ function setGrid(columns,rows){
     `repeat(${columns},1fr)`;
 
     canvas.style.gridTemplateRows =
-`repeat(${rows},1fr)`;
+    `repeat(${rows},1fr`;
 
 }
 
@@ -956,19 +949,7 @@ function updateCell(
     }
 
     iframe.src =
-buildEmbed(item.videoId);
-
-iframe.allow =
-"autoplay; encrypted-media; fullscreen";
-
-iframe.setAttribute("playsinline", "1");
-
-iframe.setAttribute("allowfullscreen", "1");
-
-iframe.setAttribute(
-"referrerpolicy",
-"origin"
-);
+    buildEmbed(videoId);
 
 }
 
