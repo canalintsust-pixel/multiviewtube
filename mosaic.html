@@ -328,19 +328,31 @@ iframe{
 
     <div class="overlay-box">
 
-        <button class="overlay-btn" onclick="openSwapModal()">
+        <button
+            class="overlay-btn"
+            tabindex="1"
+            onclick="openSwapModal()">
             TROCAR
         </button>
 
-        <button class="overlay-btn" onclick="openReplaceModal()">
+        <button
+            class="overlay-btn"
+            tabindex="2"
+            onclick="openReplaceModal()">
             SUBSTITUIR
         </button>
 
-        <button class="overlay-btn" onclick="cycleLayout()">
+        <button
+            class="overlay-btn"
+            tabindex="3"
+            onclick="cycleLayout()">
             LAYOUT
         </button>
 
-        <button class="overlay-btn" onclick="forceUpdate()">
+        <button
+            class="overlay-btn"
+            tabindex="4"
+            onclick="forceUpdate()">
             ATUALIZAR TODAS
         </button>
 
@@ -529,7 +541,7 @@ function setGrid(columns,rows){
     `repeat(${columns},1fr)`;
 
     canvas.style.gridTemplateRows =
-    `repeat(${rows},1fr`;
+    ``repeat(${rows},1fr)`;
 
 }
 
@@ -1263,6 +1275,34 @@ REABRIRÁ COM A SELEÇÃO ANTIGA.
 */
 
 /* =====================================================
+   CONTROLE REMOTO / TECLADO
+===================================================== */
+
+document.addEventListener("keydown", (e) => {
+
+    const key = e.key;
+
+    if (
+        key === "Enter" ||
+        key === "NumpadEnter" ||
+        key === " "
+    ) {
+
+        e.preventDefault();
+
+        if (
+            swapModal.style.display === "flex" ||
+            replaceModal.style.display === "flex"
+        ) {
+            return;
+        }
+
+        showOverlay();
+    }
+
+});
+
+/* =====================================================
    START
 ===================================================== */
 
@@ -1275,6 +1315,12 @@ setInterval(
     300000
 );
 
+init();
+
+setInterval(
+    forceUpdate,
+    300000
+);
 </script>
 
 </body>
