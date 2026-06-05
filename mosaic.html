@@ -114,6 +114,17 @@ iframe{
 }
 
 /* =====================================================
+   FOCO CONTROLE REMOTO
+===================================================== */
+
+.overlay-btn:focus,
+.action-btn:focus,
+.close-btn:focus,
+input:focus {
+    outline: 3px solid #00ff66;
+    outline-offset: 2px;
+}
+/* =====================================================
    MODAIS
 ===================================================== */
 
@@ -329,29 +340,37 @@ iframe{
     <div class="overlay-box">
 
         <button
+            id="btnSwap"
             class="overlay-btn"
             tabindex="1"
+            type="button"
             onclick="openSwapModal()">
             TROCAR
         </button>
 
         <button
+            id="btnReplace"
             class="overlay-btn"
             tabindex="2"
+            type="button"
             onclick="openReplaceModal()">
             SUBSTITUIR
         </button>
 
         <button
+            id="btnLayout"
             class="overlay-btn"
             tabindex="3"
+            type="button"
             onclick="cycleLayout()">
             LAYOUT
         </button>
 
         <button
+            id="btnUpdate"
             class="overlay-btn"
             tabindex="4"
+            type="button"
             onclick="forceUpdate()">
             ATUALIZAR TODAS
         </button>
@@ -1082,6 +1101,16 @@ function showOverlay(){
     }
 
     overlay.style.display = "flex";
+    setTimeout(() => {
+
+    const firstBtn =
+        overlay.querySelector(".overlay-btn");
+
+    if(firstBtn){
+        firstBtn.focus();
+    }
+
+},50);
 
     clearTimeout(overlayTimer);
 
@@ -1280,26 +1309,52 @@ REABRIRÁ COM A SELEÇÃO ANTIGA.
 
 document.addEventListener("keydown", (e) => {
 
-    if (
+    const isEnter =
         e.key === "Enter" ||
         e.key === "NumpadEnter" ||
         e.key === "OK" ||
         e.key === "Select" ||
         e.code === "Enter" ||
-        e.keyCode === 13
+        e.keyCode === 13;
+
+    if (!isEnter) return;
+
+    e.preventDefault();
+
+    const focused = document.activeElement;
+
+    if (
+        focused &&
+        (
+            focused.tagName === "BUTTON" ||
+            focused.classList.contains("overlay-btn") ||
+            focused.classList.contains("action-btn") ||
+            focused.classList.contains("close-btn")
+        )
     ) {
+        focused.click();
+        return;
+    }
 
-        e.preventDefault();
+    if (
+        swapModal.style.display === "flex" ||
+        replaceModal.style.display === "flex"
+    ) {
+        return;
+    }
 
-        if (
-            swapModal.style.display === "flex" ||
-            replaceModal.style.display === "flex"
-        ) {
-            return;
+    showOverlay();
+
+    setTimeout(() => {
+
+        const firstBtn =
+            overlay.querySelector(".overlay-btn");
+
+        if(firstBtn){
+            firstBtn.focus();
         }
 
-        showOverlay();
-    }
+    },50);
 
 });
 
