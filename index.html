@@ -114,66 +114,133 @@ const channels = [
 ];
 
 const MAX = 6;
+
 const listEl = document.getElementById("channelList");
 const counterEl = document.getElementById("counter");
 
-let selected = JSON.parse(localStorage.getItem("selectedChannels") || "[]");
+let selected =
+JSON.parse(
+  localStorage.getItem("selectedChannels") || "[]"
+);
+
+let lastFocusedIndex = 0;
 
 function render() {
+
   listEl.innerHTML = "";
 
-  channels.forEach(ch => {
-    const div = document.createElement("div");
+  channels.forEach((ch,index)=>{
+
+    const div =
+    document.createElement("div");
+
     div.className = "channel";
 
-    const checked = selected.includes(ch.id);
+    div.tabIndex = index + 1;
+
+    const checked =
+    selected.includes(ch.id);
 
     div.innerHTML = `
-      <input type="checkbox" ${checked ? "checked" : ""} />
+      <input type="checkbox"
+      ${checked ? "checked" : ""}
+      tabindex="-1">
       <span>${ch.name}</span>
     `;
 
-    div.onclick = () => toggleChannel(ch.id);
+    div.addEventListener("focus",()=>{
+      lastFocusedIndex = index;
+    });
+
+    div.onclick = ()=>{
+      toggleChannel(ch.id,index);
+    };
 
     listEl.appendChild(div);
+
   });
 
   updateCounter();
+
+  requestAnimationFrame(()=>{
+
+    const items =
+    document.querySelectorAll(".channel");
+
+    if(items[lastFocusedIndex]){
+      items[lastFocusedIndex].focus();
+    }
+
+  });
+
 }
 
-function toggleChannel(id) {
-  const index = selected.indexOf(id);
+function toggleChannel(id,index){
 
-  if (index >= 0) {
-    selected.splice(index, 1);
-  } else {
-    if (selected.length >= MAX) return;
+  lastFocusedIndex = index;
+
+  const found =
+  selected.indexOf(id);
+
+  if(found >= 0){
+
+    selected.splice(found,1);
+
+  }else{
+
+    if(selected.length >= MAX){
+      return;
+    }
+
     selected.push(id);
+
   }
 
-  localStorage.setItem("selectedChannels", JSON.stringify(selected));
+  localStorage.setItem(
+    "selectedChannels",
+    JSON.stringify(selected)
+  );
+
   render();
+
 }
 
-function updateCounter() {
-  counterEl.textContent = `${selected.length} / ${MAX} selecionados`;
+function updateCounter(){
+
+  counterEl.textContent =
+  `${selected.length} / ${MAX} selecionados`;
+
 }
 
-document.getElementById("clearBtn").onclick = () => {
+document.getElementById("clearBtn").onclick = ()=>{
+
   selected = [];
-  localStorage.removeItem("selectedChannels");
+
+  localStorage.removeItem(
+    "selectedChannels"
+  );
+
   render();
+
 };
 
-document.getElementById("openBtn").onclick = () => {
-  if (selected.length === 0) return;
+document.getElementById("openBtn").onclick = ()=>{
 
-  localStorage.setItem("selectedChannels", JSON.stringify(selected));
-  window.location.href = "mosaic.html";
+  if(selected.length === 0){
+    return;
+  }
+
+  localStorage.setItem(
+    "selectedChannels",
+    JSON.stringify(selected)
+  );
+
+  window.location.href =
+  "mosaic.html";
+
 };
 
 render();
 </script>
-
 </body>
 </html>
