@@ -329,7 +329,6 @@ input:focus {
 
 <body>
 
-<button id="backBtn">←</button>
 
 <div id="canvas"></div>
 
@@ -338,6 +337,12 @@ input:focus {
 <div id="overlay">
 
     <div class="overlay-box">
+
+    <button
+        class="overlay-btn"
+        onclick="handleBack()">
+        VOLTAR
+    </button>
 
         <button
             id="btnSwap"
@@ -489,8 +494,6 @@ document.getElementById("replaceConfirmBtn");
 const toast =
 document.getElementById("toast");
 
-const backBtn =
-document.getElementById("backBtn");
 
 /* =====================================================
    CONFIG
@@ -1152,12 +1155,6 @@ document.addEventListener(
             return;
         }
 
-        if(
-            e.target === backBtn
-        ){
-            return;
-        }
-
         showOverlay();
 
     }
@@ -1201,19 +1198,11 @@ function handleBack(){
 
 }
 
-backBtn.addEventListener(
-    "click",
-    handleBack
-);
 
 /* =====================================================
    BOTÃO VOLTAR ANDROID
 ===================================================== */
 
-history.pushState(
-    { page:"mosaic" },
-    ""
-);
 
 window.addEventListener(
     "popstate",
