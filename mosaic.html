@@ -541,7 +541,7 @@ function setGrid(columns,rows){
     `repeat(${columns},1fr)`;
 
     canvas.style.gridTemplateRows =
-    ``repeat(${rows},1fr)`;
+    `repeat(${rows},1fr)`;
 
 }
 
@@ -1280,12 +1280,13 @@ REABRIRÁ COM A SELEÇÃO ANTIGA.
 
 document.addEventListener("keydown", (e) => {
 
-    const key = e.key;
-
     if (
-        key === "Enter" ||
-        key === "NumpadEnter" ||
-        key === " "
+        e.key === "Enter" ||
+        e.key === "NumpadEnter" ||
+        e.key === "OK" ||
+        e.key === "Select" ||
+        e.code === "Enter" ||
+        e.keyCode === 13
     ) {
 
         e.preventDefault();
@@ -1315,12 +1316,6 @@ setInterval(
     300000
 );
 
-init();
-
-setInterval(
-    forceUpdate,
-    300000
-);
 </script>
 
 </body>
